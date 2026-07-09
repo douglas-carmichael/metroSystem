@@ -446,8 +446,8 @@ private struct SCADAAlarmPanel: View {
                 HStack(spacing: 8) {
                     failureButton("CTRL", source: "SYS", point: "CONTROLLER", severity: .major, messageKey: "alarm.msg.controller")
                     failureButton("PWR", source: "PWR", point: "TRACTION_750V", severity: .critical, messageKey: "alarm.msg.power")
-                    failureButton("VOIE", source: "VOIE", point: "TRACK_CIRCUIT", severity: .major, messageKey: "alarm.msg.track")
-                    failureButton("QUAI", source: "QUAI", point: "PLATFORM_DOOR", severity: .minor, messageKey: "alarm.msg.platform")
+                    failureButton("TRACK", source: "TRACK", point: "TRACK_CIRCUIT", severity: .major, messageKey: "alarm.msg.track")
+                    failureButton("PLATFORM", source: "PLATFORM", point: "PLATFORM_DOOR", severity: .minor, messageKey: "alarm.msg.platform")
                     RetroButton(language.t("alarm.clear.ack"), enabled: world.hasClearableAcknowledgedAlarms) {
                         _ = world.clearAcknowledgedActiveAlarms()
                     }
@@ -497,11 +497,11 @@ private struct SCADAAlarmPanel: View {
     private static let injectorPool: [InjectorPick] = [
         .init(source: "SYS",  point: "CONTROLLER",    severity: .major,    messageKey: "alarm.msg.controller", weight: 1),
         .init(source: "PWR",  point: "TRACTION_750V", severity: .critical, messageKey: "alarm.msg.power",      weight: 1),
-        .init(source: "VOIE", point: "TRACK_CIRCUIT", severity: .major,    messageKey: "alarm.msg.track",      weight: 2),
-        .init(source: "QUAI", point: "PLATFORM_DOOR", severity: .minor,    messageKey: "alarm.msg.platform",   weight: 5),
-        .init(source: "RAME", point: "CTC_RADIO",     severity: .major,    messageKey: "alarm.msg.signalfault", weight: 2),
-        .init(source: "QUAI", point: "AFFICHEUR",     severity: .advisory, messageKey: "alarm.msg.display",    weight: 6),
-        .init(source: "VOIE", point: "AIGUILLE",      severity: .minor,    messageKey: "alarm.msg.switch",     weight: 4),
+        .init(source: "TRACK",    point: "TRACK_CIRCUIT",    severity: .major,    messageKey: "alarm.msg.track",       weight: 2),
+        .init(source: "PLATFORM", point: "PLATFORM_DOOR",    severity: .minor,    messageKey: "alarm.msg.platform",    weight: 5),
+        .init(source: "RAME",     point: "CTC_RADIO",        severity: .major,    messageKey: "alarm.msg.signalfault", weight: 2),
+        .init(source: "PLATFORM", point: "PLATFORM_DISPLAY", severity: .advisory, messageKey: "alarm.msg.display",     weight: 6),
+        .init(source: "TRACK",    point: "TRACK_SWITCH",     severity: .minor,    messageKey: "alarm.msg.switch",      weight: 4),
     ]
 
     private static let weightedPool: [InjectorPick] = injectorPool.flatMap {
@@ -519,13 +519,13 @@ private struct SCADAAlarmPanel: View {
             } else {
                 resolvedSource = "RAME FLEET"
             }
-        } else if pick.source == "QUAI" || pick.source == "VOIE" {
+        } else if pick.source == "PLATFORM" || pick.source == "TRACK" {
             // Bind platform / track faults to a real station or canton so
             // the row reads like a located field fault.
-            if pick.source == "QUAI", let station = world.stations.randomElement() {
-                resolvedSource = "QUAI \(station.id)"
+            if pick.source == "PLATFORM", let station = world.stations.randomElement() {
+                resolvedSource = "PLATFORM \(station.id)"
             } else if let canton = world.cantons.randomElement() {
-                resolvedSource = "VOIE C\(canton.id)"
+                resolvedSource = "TRACK C\(canton.id)"
             } else {
                 resolvedSource = pick.source
             }

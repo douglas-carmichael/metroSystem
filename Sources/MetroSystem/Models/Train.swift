@@ -84,6 +84,8 @@ struct Train: Identifiable, Hashable, Codable {
     var paxRemaining: Int = 0
     var paxExchangeInterval: TimeInterval = 0
     var paxExchangeTimer: TimeInterval = 0
+    var paxBoarding: Int = 0           // montée: boarded at the current stop
+    var paxAlighting: Int = 0          // descente: alighted at the current stop
 
     // Latched fault injection (PCC failure panel / DCL SET RAME).
     var isDoorFault: Bool = false      // défaut portes -- forces FU
@@ -150,7 +152,7 @@ struct Train: Identifiable, Hashable, Codable {
         case manualSpeedRequest, doorsOpen, isDwelling, dwellRemaining
         case isDepartureHold, lastServicedStationId, nextStationName
         case passengerCount, lastPaxChange, paxRemaining
-        case paxExchangeInterval, paxExchangeTimer
+        case paxExchangeInterval, paxExchangeTimer, paxBoarding, paxAlighting
         case isDoorFault, isEngineFault, isBrakeFault, isSignalFault
         case isPatinage, isEnrayage, isEmergencyBrakeApplied
         case consigneVitesse, speedError, distanceToMA, tires
@@ -195,6 +197,8 @@ struct Train: Identifiable, Hashable, Codable {
         paxRemaining = try c.decodeIfPresent(Int.self, forKey: .paxRemaining) ?? 0
         paxExchangeInterval = try c.decodeIfPresent(TimeInterval.self, forKey: .paxExchangeInterval) ?? 0
         paxExchangeTimer = try c.decodeIfPresent(TimeInterval.self, forKey: .paxExchangeTimer) ?? 0
+        paxBoarding = try c.decodeIfPresent(Int.self, forKey: .paxBoarding) ?? 0
+        paxAlighting = try c.decodeIfPresent(Int.self, forKey: .paxAlighting) ?? 0
         isDoorFault = try c.decodeIfPresent(Bool.self, forKey: .isDoorFault) ?? false
         isEngineFault = try c.decodeIfPresent(Bool.self, forKey: .isEngineFault) ?? false
         isBrakeFault = try c.decodeIfPresent(Bool.self, forKey: .isBrakeFault) ?? false

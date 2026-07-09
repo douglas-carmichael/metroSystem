@@ -106,6 +106,11 @@ final class DCLScriptStore {
     /// is created.  Subsequent launches leave whatever the operator wrote
     /// alone.
     private func seedIfNeeded() {
+        // An earlier build seeded a LOGIN.COM whose closing WRITE banner
+        // truncated on "/" and printed English in both language modes. Drop
+        // any copy still carrying that line so the current (WRITE-free)
+        // LOGIN.COM re-seeds below.
+        migrate(name: "LOGIN.COM", ifContains: "follow the interface language (SHOW")
         seed(name: "STARTUP.COM", body: """
         $ ! METRO$ROOT:[CONTROL]STARTUP.COM
         $ ! Boot-time initialization for the metro line controller
@@ -125,10 +130,9 @@ final class DCLScriptStore {
         $ ! English mode, the French ones (RAME FLOTTE LIGNE GARES PAX
         $ ! URGENCE REPRISE AIDE) only in French mode. There is nothing to
         $ ! define here; VALCP itself is the installed layered product.
-        $ ! Run automatically by the shell after the LPD splash.
+        $ ! Type HELP VALCP for the reference.
         $ SET NOON
         $ VALCP    == "$SYS$SYSTEM:VALCP.EXE"
-        $ WRITE SYS$OUTPUT "LPD VAL-CP short-form aliases follow the interface language (SHOW/SET/VALCP always English)."
         $ EXIT
         """)
         seed(name: "HELLO.COM", body: """
@@ -167,6 +171,17 @@ final class DCLScriptStore {
         let u = url(for: name)
         if !FileManager.default.fileExists(atPath: u.path) {
             try? body.write(to: u, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Removes a seeded file if it still contains `marker`, so a corrected
+    /// default re-seeds on next launch. Scoped to the exact stale text, so a
+    /// file the operator has since edited past the marker is left untouched.
+    private func migrate(name: String, ifContains marker: String) {
+        let u = url(for: name)
+        if let existing = try? String(contentsOf: u, encoding: .utf8),
+           existing.contains(marker) {
+            try? FileManager.default.removeItem(at: u)
         }
     }
 }

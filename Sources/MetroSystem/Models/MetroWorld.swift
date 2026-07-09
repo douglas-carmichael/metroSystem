@@ -604,6 +604,8 @@ final class MetroWorld: ObservableObject {
                     train.doorsOpen = false
                     train.status = .moving
                     train.lastPaxChange = 0
+                    train.paxBoarding = 0
+                    train.paxAlighting = 0
                 }
             } else {
                 if train.paxRemaining != 0 {
@@ -710,8 +712,15 @@ final class MetroWorld: ObservableObject {
         train.speed = 0
         train.acceleration = 0
         train.lastServicedStationId = stationId
-        let headroom = max(0, Sim.paxCapacity - train.passengerCount)
-        let change = Int.random(in: -min(Sim.paxAlightMax, train.passengerCount)...min(Sim.paxBoardMax, headroom))
+        // Passenger exchange as separate alighting (descente) then boarding
+        // (montée) flows so the detail screen can show both; the net change
+        // is what the dwell loop applies one-by-one to the load.
+        let alighting = Int.random(in: 0...min(Sim.paxAlightMax, train.passengerCount))
+        let headroom = max(0, Sim.paxCapacity - (train.passengerCount - alighting))
+        let boarding = Int.random(in: 0...min(Sim.paxBoardMax, headroom))
+        let change = boarding - alighting
+        train.paxBoarding = boarding
+        train.paxAlighting = alighting
         train.lastPaxChange = change
         train.paxRemaining = change
         train.paxExchangeInterval = abs(change) > 0 ? (dwell * 0.6) / Double(abs(change)) : 1.0

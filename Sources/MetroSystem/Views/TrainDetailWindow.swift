@@ -58,7 +58,7 @@ struct TrainDetailWindow: View {
                     ATPSection(train: train)
                     AuxiliarySection(train: train)
                 }
-                ElectricalSynopticSection(train: train)
+                ElectricalSynopticSection(train: train, editable: isLocal)
                 AuxControlsSection(train: train, editable: isLocal)
                 PneumaticsSection(train: train, editable: isLocal)
                 DiagnosticFooter(train: train)
@@ -379,6 +379,12 @@ private struct ExploitationSection: View {
                          value: train.nextStationName, color: RetroTheme.cyan)
                 ValueRow(label: language.t("train.pax"),
                          value: "\(train.passengerCount) / \(Sim.paxCapacity)")
+                ValueRow(label: language.t("detail.exploit.boarding"),
+                         value: "+\(train.paxBoarding)",
+                         color: train.paxBoarding > 0 ? RetroTheme.green : RetroTheme.amberDim)
+                ValueRow(label: language.t("detail.exploit.alighting"),
+                         value: "-\(train.paxAlighting)",
+                         color: train.paxAlighting > 0 ? RetroTheme.cyan : RetroTheme.amberDim)
                 IndicatorRow(label: language.t("detail.exploit.dwell"),
                              active: train.isDwelling, color: RetroTheme.amber)
                 IndicatorRow(label: language.t("detail.exploit.hold"),
@@ -586,7 +592,10 @@ private struct AuxControlButton: View {
 /// dropping the lighting and ventilation loads. Node labels localise EN / FR.
 private struct ElectricalSynopticSection: View {
     let train: Train
+    let editable: Bool
     @EnvironmentObject var language: AppLanguage
+    @EnvironmentObject var world: MetroWorld
+    @State private var selected: Subsystem?
 
     var body: some View {
         BoxPanel(title: language.t("detail.sec.diagram"), accent: RetroTheme.green) {
@@ -594,38 +603,64 @@ private struct ElectricalSynopticSection: View {
                 let s = proxy.size
                 ZStack {
                     wiring(size: s)
-                    // 750 V line pickup shoes.
+                    // 750 V line pickup shoes (both open the pickup screen).
                     DiagNode(title: language.t("detail.node.shoel"),
                              value: String(format: "%.0f V", train.mainVoltage),
-                             color: RetroTheme.red, x: 0.06, y: 0.80, size: s)
+                             color: RetroTheme.red, x: 0.06, y: 0.80, size: s,
+                             selected: selected == .pickup) { selected = .pickup }
                     DiagNode(title: language.t("detail.node.shoer"),
                              value: String(format: "%.0f V", train.mainVoltage),
-                             color: RetroTheme.red, x: 0.94, y: 0.80, size: s)
+                             color: RetroTheme.red, x: 0.94, y: 0.80, size: s,
+                             selected: selected == .pickup) { selected = .pickup }
                     // Static converter and motor-alternator/compressor group.
                     DiagNode(title: language.t("detail.node.cvs"),
                              value: String(format: "%.0f V", train.cvsOutputVoltage),
-                             color: RetroTheme.cyan, x: 0.30, y: 0.40, size: s)
+                             color: RetroTheme.cyan, x: 0.30, y: 0.40, size: s,
+                             selected: selected == .cvs) { selected = .cvs }
                     DiagNode(title: language.t("detail.node.compressor"),
-                             value: train.isCompressorRunning ? language.t("detail.atp.ok").replacingOccurrences(of: "OK", with: "ON") : "OFF",
+                             value: train.isCompressorRunning ? language.t("sub.val.run") : language.t("sub.val.stop"),
                              color: train.isCompressorRunning ? RetroTheme.green : RetroTheme.amberDim,
-                             x: 0.70, y: 0.40, size: s)
+                             x: 0.70, y: 0.40, size: s,
+                             selected: selected == .compressor) { selected = .compressor }
                     // Battery and main reservoir.
                     DiagNode(title: language.t("detail.node.battery"),
                              value: String(format: "%.1f V", train.batteryVoltage),
-                             color: RetroTheme.cyan, x: 0.50, y: 0.62, size: s)
+                             color: RetroTheme.cyan, x: 0.50, y: 0.62, size: s,
+                             selected: selected == .battery) { selected = .battery }
                     DiagNode(title: language.t("detail.node.reservoir"),
                              value: String(format: "%.1f bar", train.compressorPressure),
-                             color: RetroTheme.cyan, x: 0.70, y: 0.62, size: s)
+                             color: RetroTheme.cyan, x: 0.70, y: 0.62, size: s,
+                             selected: selected == .compressor) { selected = .compressor }
                     // DELESTAGE BT contact state.
                     DiagNode(title: language.t("detail.node.delestage"),
-                             value: train.isLoadSheddingActive ? "ACT" : "—",
+                             value: train.isLoadSheddingActive ? language.t("sub.val.active") : "—",
                              color: train.isLoadSheddingActive ? RetroTheme.red : RetroTheme.greenDim,
-                             x: 0.30, y: 0.75, size: s)
+                             x: 0.30, y: 0.75, size: s,
+                             selected: selected == .delestage) { selected = .delestage }
                     // Shed loads.
                     DiagLamp(title: language.t("detail.node.lighting"),
-                             active: train.areLightsOn, x: 0.10, y: 0.90, size: s)
+                             active: train.areLightsOn, x: 0.10, y: 0.90, size: s,
+                             selected: selected == .lighting) { selected = .lighting }
                     DiagLamp(title: language.t("detail.node.ventilation"),
-                             active: train.areVentilated, x: 0.24, y: 0.90, size: s)
+                             active: train.areVentilated, x: 0.24, y: 0.90, size: s,
+                             selected: selected == .ventilation) { selected = .ventilation }
+                }
+                // Prompt when idle; the drill-down screen when a node is picked.
+                .overlay(alignment: .topTrailing) {
+                    if selected == nil {
+                        Text(language.t("sub.hint"))
+                            .font(RetroTheme.monoSm)
+                            .foregroundColor(RetroTheme.amberDim)
+                            .padding(6)
+                    }
+                }
+                .overlay(alignment: .trailing) {
+                    if let sel = selected {
+                        SubsystemPanel(subsystem: sel, train: train, editable: editable) {
+                            selected = nil
+                        }
+                        .padding(8)
+                    }
                 }
             }
             .frame(height: 250)
@@ -688,6 +723,8 @@ private struct DiagNode: View {
     let x: CGFloat
     let y: CGFloat
     let size: CGSize
+    var selected: Bool = false
+    var onTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 1) {
@@ -702,7 +739,10 @@ private struct DiagNode: View {
         .padding(.horizontal, 5)
         .padding(.vertical, 3)
         .background(RetroTheme.bg)
-        .overlay(Rectangle().stroke(color.opacity(0.8), lineWidth: 1))
+        .overlay(Rectangle().stroke(selected ? RetroTheme.cyan : color.opacity(0.8),
+                                    lineWidth: selected ? 2 : 1))
+        .contentShape(Rectangle())
+        .onTapGesture { onTap?() }
         .position(x: size.width * x, y: size.height * y)
     }
 }
@@ -714,19 +754,140 @@ private struct DiagLamp: View {
     let x: CGFloat
     let y: CGFloat
     let size: CGSize
+    var selected: Bool = false
+    var onTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 2) {
             Circle()
                 .fill(active ? RetroTheme.amber : Color.clear)
-                .overlay(Circle().stroke(active ? RetroTheme.amber : RetroTheme.amberDim, lineWidth: 1))
+                .overlay(Circle().stroke(selected ? RetroTheme.cyan : (active ? RetroTheme.amber : RetroTheme.amberDim),
+                                         lineWidth: selected ? 2 : 1))
                 .frame(width: 16, height: 16)
             Text(title)
                 .font(RetroTheme.monoSm)
                 .foregroundColor(active ? RetroTheme.amber : RetroTheme.amberDim)
         }
         .fixedSize()
+        .contentShape(Rectangle())
+        .onTapGesture { onTap?() }
         .position(x: size.width * x, y: size.height * y)
+    }
+}
+
+// MARK: - Subsystem drill-down
+
+/// The subsystems reachable by clicking a node on the electrical synoptic,
+/// mirroring the DC CBTC auxiliary-view drill-down. Each produces its own
+/// screen of readouts.
+private enum Subsystem: String, Identifiable {
+    case pickup, cvs, compressor, battery, delestage, lighting, ventilation
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .pickup:      return "sub.title.pickup"
+        case .cvs:         return "sub.title.cvs"
+        case .compressor:  return "sub.title.compressor"
+        case .battery:     return "sub.title.battery"
+        case .delestage:   return "sub.title.delestage"
+        case .lighting:    return "sub.title.lighting"
+        case .ventilation: return "sub.title.ventilation"
+        }
+    }
+
+    /// The readout rows for this subsystem: (label, value, value colour).
+    @MainActor func rows(train: Train, language: AppLanguage) -> [(String, String, Color)] {
+        func t(_ k: String) -> String { language.t(k) }
+        let val = RetroTheme.amberBright, on = RetroTheme.green, info = RetroTheme.cyan
+        let dim = RetroTheme.amberDim
+        switch self {
+        case .pickup:
+            return [(t("sub.row.linev"), String(format: "%.0f V", train.mainVoltage), val),
+                    (t("sub.row.current"), "120 A", val),
+                    (t("sub.row.shoel"), t("sub.val.active"), on),
+                    (t("sub.row.shoer"), t("sub.val.active"), on)]
+        case .cvs:
+            return [(t("sub.row.input"), String(format: "%.0f V", train.mainVoltage), val),
+                    (t("sub.row.output"), String(format: "%.0f V", train.cvsOutputVoltage), info),
+                    (t("sub.row.temp"), "45 °C", val),
+                    (t("sub.row.load"), "65 %", val)]
+        case .compressor:
+            return [(t("sub.row.state"), train.isCompressorRunning ? t("sub.val.run") : t("sub.val.stop"),
+                     train.isCompressorRunning ? on : dim),
+                    (t("sub.row.pressure"), String(format: "%.1f bar", train.compressorPressure), val),
+                    (t("sub.row.oil"), t("sub.val.ok"), on),
+                    (t("sub.row.vibration"), t("sub.val.normal"), on)]
+        case .battery:
+            return [(t("sub.row.voltage"), String(format: "%.1f V", train.batteryVoltage), info),
+                    (t("sub.row.current"), "+12 A", on),
+                    (t("sub.row.charge"), "92 %", val),
+                    (t("sub.row.temp"), "22 °C", val)]
+        case .delestage:
+            return [(t("sub.row.state"), train.isLoadSheddingActive ? t("sub.val.active") : t("sub.val.inactive"),
+                     train.isLoadSheddingActive ? RetroTheme.red : RetroTheme.greenDim),
+                    (t("sub.row.lighting"), train.isLoadSheddingActive ? t("sub.val.reduced") : t("sub.val.normal"), val),
+                    (t("sub.row.ventilation"), train.areVentilated ? t("sub.val.on") : t("sub.val.off"),
+                     train.areVentilated ? on : dim)]
+        case .lighting:
+            return [(t("sub.row.voltage"), String(format: "%.0f V", train.cvsOutputVoltage), info),
+                    (t("sub.row.current"), String(format: "%.1f A", train.lightingCurrent), val),
+                    (t("sub.row.circa"), t("sub.val.ok"), on),
+                    (t("sub.row.circb"), t("sub.val.ok"), on)]
+        case .ventilation:
+            return [(t("sub.row.mode"), t("sub.val.ac"), info),
+                    (t("sub.row.setpoint"), String(format: "%.0f °C", train.targetTemperature), val),
+                    (t("sub.row.interior"), String(format: "%.0f °C", train.interiorTemperature), val),
+                    (t("sub.row.fans"), train.areVentilated ? t("sub.val.run") : t("sub.val.stop"),
+                     train.areVentilated ? on : dim)]
+        }
+    }
+}
+
+/// The floating drill-down screen for one subsystem, opened from the
+/// synoptic. Read-only readouts plus, on DELESTAGE BT, an owner-only toggle.
+private struct SubsystemPanel: View {
+    let subsystem: Subsystem
+    let train: Train
+    let editable: Bool
+    let onClose: () -> Void
+    @EnvironmentObject var world: MetroWorld
+    @EnvironmentObject var language: AppLanguage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 10) {
+                Text(language.t(subsystem.titleKey))
+                    .font(RetroTheme.mono)
+                    .foregroundColor(RetroTheme.cyan)
+                    .retroGlow()
+                Spacer()
+                Button(action: onClose) {
+                    Text("✕").font(RetroTheme.mono).foregroundColor(.red)
+                }
+                .buttonStyle(.plain)
+            }
+            HRule(RetroTheme.amberDim)
+            ForEach(Array(subsystem.rows(train: train, language: language).enumerated()), id: \.offset) { _, row in
+                HStack {
+                    Text(row.0).font(RetroTheme.monoSm).foregroundColor(RetroTheme.amber)
+                    Spacer(minLength: 16)
+                    Text(row.1).font(RetroTheme.monoSm).foregroundColor(row.2)
+                }
+            }
+            if subsystem == .delestage {
+                RetroButton(train.isLoadSheddingActive ? language.t("sub.val.inactive") : language.t("sub.val.active"),
+                            enabled: editable,
+                            highlighted: train.isLoadSheddingActive) {
+                    world.mutate(train.id) { $0.setLoadShedding(!$0.isLoadSheddingActive) }
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(10)
+        .frame(width: 236, alignment: .leading)
+        .background(RetroTheme.bgPanel)
+        .overlay(Rectangle().stroke(RetroTheme.cyan, lineWidth: 1))
     }
 }
 
