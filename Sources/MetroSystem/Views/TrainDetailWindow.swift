@@ -26,7 +26,10 @@ struct TrainDetailWindow: View {
             }
         }
         .frame(minWidth: 900, minHeight: 680)
-        .environment(\.colorScheme, .dark)
+        // Rebuild the whole subtree on a skin switch so every element — even
+        // leaf gauges that don't observe AppLanguage — picks up the palette.
+        .id(language.themeKind)
+        .environment(\.colorScheme, language.themeKind == .retro ? .dark : .light)
         .navigationTitle(language.t("window.traindetail"))
     }
 
@@ -95,6 +98,10 @@ private struct DetailBanner: View {
                     .foregroundColor(RetroTheme.amberDim)
             }
             Spacer()
+            RetroButton("\(language.t("theme.label")): \(language.t(language.themeKind == .retro ? "theme.retro" : "theme.iso"))",
+                        highlighted: language.themeKind == .iso101) {
+                language.toggleTheme()
+            }
             Text(isLocal ? language.t("train.tag.local") : language.t("train.tag.remote"))
                 .font(RetroTheme.mono)
                 .foregroundColor(RetroTheme.bg)

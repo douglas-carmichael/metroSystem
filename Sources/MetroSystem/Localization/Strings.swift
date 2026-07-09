@@ -131,6 +131,10 @@ enum Strings {
         add("detail.node.delestage","LOAD SHED",                          "DÉLESTAGE")
         add("detail.node.lighting", "LIGHTING",                           "ÉCLAIRAGE")
         add("detail.node.ventilation","VENT",                             "VENTIL.")
+        // Display-skin toggle (retro phosphor vs ISA-101 high-performance HMI).
+        add("theme.label",          "DISPLAY",                            "AFFICHAGE")
+        add("theme.retro",          "RETRO",                              "RÉTRO")
+        add("theme.iso",            "ISA-101",                            "ISA-101")
         // Passenger exchange (montée / descente) on the detail screen.
         add("detail.exploit.boarding","BOARDING",                         "MONTÉE")
         add("detail.exploit.alighting","ALIGHTING",                       "DESCENTE")
