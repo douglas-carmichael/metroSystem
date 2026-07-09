@@ -41,7 +41,7 @@ extension DCLEngine {
         guard let first = args.first else {
             return "%START-W-MISSPARM, usage: START LINE  or  START RAME <label>\n"
         }
-        if matches(first, "LINE", min: 3) || matches(first, "LIGNE", min: 3) {
+        if matchesLoc(first, en: "LINE", fr: "LIGNE", min: 3) {
             if world.isEmergencyStopped { world.emergencyStopAll(false) }
             let was = world.isRunning
             world.startService()

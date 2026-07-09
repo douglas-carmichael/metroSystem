@@ -53,7 +53,7 @@ extension DCLEngine {
         switch true {
         case matches(what, "RAME"):              return showRameVALCP(cmd)
         case matches(what, "RAMES", min: 5):     return showFleet()
-        case matches(what, "LIGNE", min: 4) || matches(what, "LINE", min: 4):
+        case matchesLoc(what, en: "LINE", fr: "LIGNE", min: 4):
             return showLigneVALCP()
         case matches(what, "STATIONS", min: 4):  return showStationsVALCP()
         case matches(what, "PAX"):               return showPax()
@@ -69,7 +69,7 @@ extension DCLEngine {
         }
         switch true {
         case matches(what, "RAME"):              return setRame(cmd)
-        case matches(what, "LIGNE", min: 4) || matches(what, "LINE", min: 4):
+        case matchesLoc(what, en: "LINE", fr: "LIGNE", min: 4):
             return setLigne(cmd)
         default:
             fail("DCL-W-IVKEYW", "%X00038088")

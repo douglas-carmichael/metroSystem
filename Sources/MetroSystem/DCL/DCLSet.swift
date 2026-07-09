@@ -16,7 +16,7 @@ extension DCLEngine {
         case matches(what, "PROCESS", min: 4):  return setProcess(cmd)
         case matches(what, "STANDARD", min: 3): return setStandard(cmd)
         case matches(what, "RAME", min: 4):     return setRame(cmd)
-        case matches(what, "LIGNE", min: 4) || matches(what, "LINE", min: 4):
+        case matchesLoc(what, en: "LINE", fr: "LIGNE", min: 4):
             return setLigne(cmd)
         default:
             return noPriv("SET \(what)")
@@ -75,8 +75,7 @@ extension DCLEngine {
                 return tr("valcp.ligne.serviceoff")
             }
         }
-        if let emer = cmd.qualifierValue("EMERGENCY", min: 4)
-                        ?? cmd.qualifierValue("URGENCE", min: 4) {
+        if let emer = cmd.qualifierValue(locQual(en: "EMERGENCY", fr: "URGENCE"), min: 4) {
             if emer.uppercased() == "ON" {
                 world.emergencyStopAll(true)
                 return tr("valcp.ligne.emeron")
@@ -217,19 +216,24 @@ extension DCLEngine {
             case .noLink:    return String(format: tr("valcp.rame.nolink"), dLabel)
             }
         }
-        if cmd.hasQualifier("MANUAL", min: 3) || cmd.hasQualifier("MANUELLE", min: 3) {
+        // Qualifiers are language-gated: the French spelling resolves only
+        // in FR mode, the English only in EN mode (AUTO is a shared
+        // abbreviation accepted in both).
+        if cmd.hasQualifier(locQual(en: "MANUAL", fr: "MANUEL"), min: 3)
+            || (uiLang == .fr && cmd.hasQualifier("MANUELLE", min: 3)) {
             let was = train.mode
             return routed(.modeManual, localText: was == .manual
                 ? String(format: tr("valcp.rame.man.nochg"), dLabel)
                 : String(format: tr("valcp.rame.man.set"), dLabel))
         }
-        if cmd.hasQualifier("AUTOMATIC", min: 4) || cmd.hasQualifier("AUTO", min: 4) {
+        if cmd.hasQualifier(locQual(en: "AUTOMATIC", fr: "AUTOMATIQUE"), min: 4)
+            || cmd.hasQualifier("AUTO", min: 4) {
             let was = train.mode
             return routed(.modeAuto, localText: was == .auto
                 ? String(format: tr("valcp.rame.auto.nochg"), dLabel)
                 : String(format: tr("valcp.rame.auto.set"), dLabel))
         }
-        if let speedStr = cmd.qualifierValue("SPEED", min: 3) ?? cmd.qualifierValue("VITESSE", min: 3),
+        if let speedStr = cmd.qualifierValue(locQual(en: "SPEED", fr: "VITESSE"), min: 3),
            let requested = Double(speedStr) {
             guard train.mode == .manual else {
                 return String(format: tr("valcp.rame.speed.notmanual"), dLabel)
@@ -238,7 +242,7 @@ extension DCLEngine {
             return routed(.setSpeed, value: clamped,
                           localText: String(format: tr("valcp.rame.speed.set"), dLabel, clamped))
         }
-        if let fu = cmd.qualifierValue("FU", min: 2) {
+        if let fu = cmd.qualifierValue(locQual(en: "EB", fr: "FU"), min: 2) {
             let on = fu.uppercased() == "ON"
             return routed(on ? .fuSet : .fuRelease, localText: on
                 ? String(format: tr("valcp.rame.fu.on"), dLabel)
@@ -249,26 +253,26 @@ extension DCLEngine {
         guard isLocal else {
             return String(format: tr("valcp.rame.owneronly"), dLabel)
         }
-        // Each maps FR and EN qualifier spellings to one Train flag.
-        let faultMap: [(names: [String], set: (inout Train, Bool) -> Void, key: String)] = [
-            (["PORTES", "DOOR"],      { $0.isDoorFault = $1 },   "valcp.rame.fault.portes"),
-            (["TRACTION", "ENGINE"],  { $0.isEngineFault = $1 }, "valcp.rame.fault.traction"),
-            (["FREIN", "BRAKE"],      { $0.isBrakeFault = $1 },  "valcp.rame.fault.frein"),
-            (["CTC", "SIGNAL"],       { $0.isSignalFault = $1 }, "valcp.rame.fault.ctc"),
-            (["PATINAGE", "SLIP"],    { $0.isPatinage = $1 },    "valcp.rame.fault.patinage"),
-            (["ENRAYAGE", "SLIDE"],   { $0.isEnrayage = $1 },    "valcp.rame.fault.enrayage"),
+        // Each maps a French and an English qualifier spelling to one Train
+        // flag; only the current-language spelling is accepted.
+        let faultMap: [(fr: String, en: String, set: (inout Train, Bool) -> Void, key: String)] = [
+            ("PORTES",   "DOOR",   { $0.isDoorFault = $1 },   "valcp.rame.fault.portes"),
+            ("TRACTION", "ENGINE", { $0.isEngineFault = $1 }, "valcp.rame.fault.traction"),
+            ("FREIN",    "BRAKE",  { $0.isBrakeFault = $1 },  "valcp.rame.fault.frein"),
+            ("CTC",      "SIGNAL", { $0.isSignalFault = $1 }, "valcp.rame.fault.ctc"),
+            ("PATINAGE", "SLIP",   { $0.isPatinage = $1 },    "valcp.rame.fault.patinage"),
+            ("ENRAYAGE", "SLIDE",  { $0.isEnrayage = $1 },    "valcp.rame.fault.enrayage"),
         ]
         for entry in faultMap {
-            for name in entry.names {
-                if let v = cmd.qualifierValue(name, min: min(4, name.count)) {
-                    let on = v.uppercased() == "ON"
-                    world.mutate(train.id) { entry.set(&$0, on) }
-                    return String(format: tr(entry.key), dLabel,
-                                  on ? tr("valcp.rame.fault.set") : tr("valcp.rame.fault.cleared"))
-                }
+            let name = locQual(en: entry.en, fr: entry.fr)
+            if let v = cmd.qualifierValue(name, min: min(3, name.count)) {
+                let on = v.uppercased() == "ON"
+                world.mutate(train.id) { entry.set(&$0, on) }
+                return String(format: tr(entry.key), dLabel,
+                              on ? tr("valcp.rame.fault.set") : tr("valcp.rame.fault.cleared"))
             }
         }
-        if let tireStr = cmd.qualifierValue("PNEU", min: 4) ?? cmd.qualifierValue("TIRE", min: 4),
+        if let tireStr = cmd.qualifierValue(locQual(en: "TIRE", fr: "PNEU"), min: 4),
            let n = Int(tireStr) {
             guard (1...Sim.tireCount).contains(n) else {
                 return String(format: tr("valcp.rame.pneu.range"), Sim.tireCount)

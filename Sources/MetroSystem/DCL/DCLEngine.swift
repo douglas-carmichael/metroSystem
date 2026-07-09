@@ -742,11 +742,28 @@ final class DCLEngine: ObservableObject {
             return await execComFile(file)
         }
 
-        // Foreign-command / symbol expansion. Lets LOGIN.COM define short
-        // aliases like RAME :== "VALCP SHOW RAME"; typing `$ RAME 101` then
-        // dispatches as `$ VALCP SHOW RAME 101`. Single-shot so cyclic
-        // aliases can't loop the dispatcher.
-        if let expanded = expandSymbolAlias(head: head, cmd: cmd) {
+        // Localized metro-command aliases, gated by the UI language: the
+        // English aliases (TRAIN, FLEET, LINE, ...) resolve only in EN mode,
+        // the French ones (RAME, FLOTTE, LIGNE, ...) only in FR mode. Each
+        // expansion uses its own language's keywords so the LINE/LIGNE gate
+        // downstream accepts it. Every alias word (in EITHER language) is
+        // reserved: a wrong-language alias is NOT handed to the generic
+        // symbol expander -- it falls through to an unrecognized-verb error
+        // -- so a stale LOGIN.COM that still defines the word as a symbol
+        // can't bypass the language gate.
+        if Self.aliasWords.contains(head.uppercased()) {
+            if let expansion = metroAlias(head) {
+                let ex = parse(expansion)
+                cmd = Parsed(verb: ex.verb,
+                             positional: ex.positional + cmd.positional,
+                             qualifiers: ex.qualifiers + cmd.qualifiers)
+                head = cmd.verb
+            }
+            // else: wrong-language alias -> leave head as-is; the switch
+            // below reports it as an unrecognized command verb.
+        } else if let expanded = expandSymbolAlias(head: head, cmd: cmd) {
+            // Foreign-command / symbol expansion (user-defined LOGIN.COM
+            // symbols). Single-shot so cyclic aliases can't loop.
             cmd = expanded
             head = cmd.verb
         }
@@ -905,6 +922,63 @@ final class DCLEngine: ObservableObject {
         guard t.count >= min, c.hasPrefix(t) else { return false }
         return true
     }
+
+    // MARK: -- language-gated command vocabulary
+
+    /// The current UI language (EN when no language is attached, e.g. a
+    /// headless SELFTEST). Drives which localized command words resolve.
+    var uiLang: Lang { language?.current ?? .en }
+
+    /// Match a French/English keyword pair honouring the UI language: the
+    /// French spelling resolves only in FR mode, the English only in EN
+    /// mode. Used everywhere a bare verb accepts both a French and English
+    /// object keyword (LINE / LIGNE) so "French commands work only in
+    /// French mode, English only in English mode".
+    func matchesLoc(_ token: String, en: String, fr: String, min: Int = 3) -> Bool {
+        uiLang == .fr ? matches(token, fr, min: min) : matches(token, en, min: min)
+    }
+
+    /// The single language-appropriate spelling of a qualifier keyword, for
+    /// `qualifierValue`/`hasQualifier` lookups (FR word in FR mode, EN word
+    /// in EN mode).
+    func locQual(en: String, fr: String) -> String {
+        uiLang == .fr ? fr : en
+    }
+
+    /// Top-level metro command aliases, resolved before generic symbol
+    /// expansion and gated by the UI language. Each expands to a canonical
+    /// command using its own language's object keywords (so the LINE/LIGNE
+    /// gate accepts it). `PAX` is shared. Returns nil for an unknown or
+    /// wrong-language alias, which then falls through to the normal verb
+    /// dispatch (and an unrecognized-verb error for a gated-out alias).
+    private static let enAliases: [String: String] = [
+        "TRAIN":     "VALCP SHOW RAME",
+        "FLEET":     "VALCP SHOW RAMES",
+        "LINE":      "VALCP SHOW LINE",
+        "STATIONS":  "VALCP SHOW STATIONS",
+        "PAX":       "VALCP SHOW PAX",
+        "EMERGENCY": "STOP LINE",
+        "RESUME":    "VALCP SET LINE /NORMAL",
+    ]
+    private static let frAliases: [String: String] = [
+        "RAME":      "VALCP SHOW RAME",
+        "FLOTTE":    "VALCP SHOW RAMES",
+        "LIGNE":     "VALCP SHOW LIGNE",
+        "GARES":     "VALCP SHOW STATIONS",
+        "PAX":       "VALCP SHOW PAX",
+        "URGENCE":   "STOP LIGNE",
+        "REPRISE":   "VALCP SET LIGNE /NORMAL",
+        "AIDE":      "HELP",
+    ]
+    func metroAlias(_ head: String) -> String? {
+        (uiLang == .fr ? Self.frAliases : Self.enAliases)[head.uppercased()]
+    }
+
+    /// Every metro alias word in either language -- reserved so a
+    /// wrong-language alias errors instead of falling through to a stale
+    /// user symbol.
+    static let aliasWords: Set<String> =
+        Set(enAliases.keys).union(frAliases.keys)
 
     private static let formatter: DateFormatter = {
         let f = DateFormatter()

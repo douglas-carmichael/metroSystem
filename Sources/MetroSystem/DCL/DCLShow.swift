@@ -19,8 +19,8 @@ extension DCLEngine {
         case matches(what, "NETWORK",     min: 3): return showNetwork()
         case matches(what, "RAMES",       min: 4): return showFleet()
         case matches(what, "RAME"):                return showRameVALCP(cmd)
-        case matches(what, "LIGNE",       min: 4)
-          || matches(what, "LINE",        min: 4): return showLigneVALCP()
+        case matchesLoc(what, en: "LINE", fr: "LIGNE", min: 4):
+            return showLigneVALCP()
         case matches(what, "STATIONS",    min: 4): return showStationsVALCP()
         case matches(what, "PAX"):                 return showPax()
         case matches(what, "ALARMS",      min: 3): return showAlarms(cmd)

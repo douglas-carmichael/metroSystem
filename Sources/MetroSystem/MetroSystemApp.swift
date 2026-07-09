@@ -74,6 +74,22 @@ struct MetroSystemApp: App {
         .windowResizability(.contentMinSize)
         .defaultSize(width: 900, height: 900)
         .restorationDisabled()
+
+        // Per-rame detail window, keyed by train id: each distinct train
+        // opens its own TCMS synoptic (the DC CBTC "train detail" screen).
+        WindowGroup("Train Detail", id: "train-detail", for: UUID.self) { $trainId in
+            if let trainId {
+                TrainDetailWindow(trainId: trainId)
+                    .environmentObject(language)
+                    .environmentObject(world)
+                    .environmentObject(network)
+            } else {
+                Text("No train selected")
+            }
+        }
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 1000, height: 760)
+        .restorationDisabled()
     }
 
     private func bootstrap() {

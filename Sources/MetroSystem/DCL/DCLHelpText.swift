@@ -478,9 +478,9 @@ extension HelpLibrary {
 
     Session        SET RECALL SPAWN ATTACH LOGOUT EXIT
 
-  LOGIN.COM also defines bilingual aliases: TRAIN/RAME, FLEET/FLOTTE,
-  LINE/LIGNE, STATIONS/GARES, PAX, EMERGENCY/URGENCE, RESUME/REPRISE and
-  AIDE all expand to the matching VALCP or operator command.
+  Short-form aliases follow the interface language: English mode accepts
+  TRAIN, FLEET, LINE, STATIONS, PAX, EMERGENCY, RESUME; French mode
+  accepts RAME, FLOTTE, LIGNE, GARES, PAX, URGENCE, REPRISE, AIDE.
 
   Any command can be given the /PAGE qualifier to display long output one
   screenful at a time -- for example  SHOW SYSTEM/PAGE  or  HELP VALCP/PAGE.
@@ -559,10 +559,15 @@ extension HelpLibrary {
 
     VALCP subcommand object [parameters] [/qualifiers]
 
-  SYS$LOGIN:LOGIN.COM defines bilingual foreign-command aliases --
-  TRAIN and RAME, FLEET and FLOTTE, LINE and LIGNE, STATIONS and GARES,
-  PAX, EMERGENCY and URGENCE, RESUME and REPRISE -- so that, for
-  example, RAME 101 expands to VALCP SHOW RAME 101.
+  The short-form command aliases are gated by the interface language.
+  The English aliases -- TRAIN, FLEET, LINE, STATIONS, PAX, EMERGENCY,
+  RESUME -- resolve only in English mode; the French aliases -- RAME,
+  FLOTTE, LIGNE, GARES, PAX, URGENCE, REPRISE, AIDE -- only in French
+  mode. So in English mode TRAIN 101 expands to VALCP SHOW RAME 101,
+  while in French mode RAME 101 does. The VALCP verb itself and its
+  RAME / RAMES / STATIONS / PAX object keywords are the installed
+  product's vocabulary and work in either mode; only the LINE / LIGNE
+  object and the SET RAME fault qualifiers follow the language.
 
   Additional information available:
 

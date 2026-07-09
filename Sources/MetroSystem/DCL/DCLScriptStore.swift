@@ -119,32 +119,16 @@ final class DCLScriptStore {
         """)
         seed(name: "LOGIN.COM", body: """
         $ ! SYS$LOGIN:LOGIN.COM -- per-user logon
-        $ ! Defines the LPD layered-product foreign-command aliases so a
-        $ ! PCC operator can type short forms instead of VALCP <verb> <noun>.
-        $ ! Every alias has an English and a French spelling -- the two
-        $ ! symbols expand to the same VALCP command.
+        $ ! The LPD VAL-CP short-form command aliases are built into the
+        $ ! shell and gated by the interface language: the English aliases
+        $ ! (TRAIN FLEET LINE STATIONS PAX EMERGENCY RESUME) resolve only in
+        $ ! English mode, the French ones (RAME FLOTTE LIGNE GARES PAX
+        $ ! URGENCE REPRISE AIDE) only in French mode. There is nothing to
+        $ ! define here; VALCP itself is the installed layered product.
         $ ! Run automatically by the shell after the LPD splash.
         $ SET NOON
         $ VALCP    == "$SYS$SYSTEM:VALCP.EXE"
-        $ ! --- fleet / trains ----------------------------------- EN | FR
-        $ TRAIN    == "VALCP SHOW RAME"
-        $ RAME     == "VALCP SHOW RAME"
-        $ FLEET    == "VALCP SHOW RAMES"
-        $ FLOTTE   == "VALCP SHOW RAMES"
-        $ ! --- line ---------------------------------------------------
-        $ LINE     == "VALCP SHOW LIGNE"
-        $ LIGNE    == "VALCP SHOW LIGNE"
-        $ STATIONS == "VALCP SHOW STATIONS"
-        $ GARES    == "VALCP SHOW STATIONS"
-        $ PAX      == "VALCP SHOW PAX"
-        $ ! --- exploitation modes -------------------------------------
-        $ EMERGENCY == "STOP LINE"
-        $ URGENCE   == "STOP LINE"
-        $ RESUME    == "VALCP SET LIGNE /NORMAL"
-        $ REPRISE   == "VALCP SET LIGNE /NORMAL"
-        $ AIDE      == "HELP"
-        $ WRITE SYS$OUTPUT "LPD VAL-CP aliases loaded (EN):   TRAIN FLEET LINE STATIONS PAX EMERGENCY RESUME"
-        $ WRITE SYS$OUTPUT "Alias LPD VAL-CP chargés (FR) :   RAME FLOTTE LIGNE GARES PAX URGENCE REPRISE AIDE"
+        $ WRITE SYS$OUTPUT "LPD VAL-CP short-form aliases follow the interface language (SHOW/SET/VALCP always English)."
         $ EXIT
         """)
         seed(name: "HELLO.COM", body: """

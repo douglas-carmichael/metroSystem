@@ -28,8 +28,14 @@ English | Français
   VMS HELP library. Also reachable over `telnet localhost 2323`.
 - **Train Dynamics** — a commissioning-scope window plotting each train's
   speed against the asservissement setpoint.
+- **Train Detail** — a dedicated per-rame TCMS synoptic (double-click a
+  train card's DETAIL button): a speed dial with the setpoint needle,
+  MA / passenger / traction meters, the diagnostic sections, the ATP
+  chaîne-de-sécurité, and the eight VAL tires as two bogies of pressure
+  gauges. Modelled on the DC CBTC train-detail screen.
 
-See [docs/](docs/README.md) for the 3D synoptic and DCL screenshots.
+See [docs/](docs/README.md) for the detail-window, 3D synoptic and DCL
+screenshots.
 
 ## Simulation
 
@@ -114,9 +120,19 @@ compatibility with the app). Both run in CI (`.github/workflows/`).
 The UI is strictly bilingual: EN mode shows no French, FR mode shows no
 English, with three deliberate in-universe exceptions — the OpenVMS
 *system* banner/messages stay English in both modes (real VMS was
-English-only); SCADA source/point tags and DCL verbs are language-neutral
-identifiers; and proper nouns (VAL, PCC, the Lille station names, the LPD
-vendor name) are never translated.
+English-only); SCADA source/point tags and the OpenVMS DCL verbs are
+language-neutral identifiers; and proper nouns (VAL, PCC, the Lille station
+names, the LPD vendor name) are never translated.
+
+The **DCL metro command vocabulary follows the interface language** too:
+the English short-form aliases (`TRAIN`, `FLEET`, `LINE`, `STATIONS`,
+`EMERGENCY`, `RESUME`) resolve only in English mode and the French ones
+(`RAME`, `FLOTTE`, `LIGNE`, `GARES`, `URGENCE`, `REPRISE`, `AIDE`) only in
+French mode; likewise the `LINE`/`LIGNE` object keyword and the `SET RAME`
+fault qualifiers (`/BRAKE` vs `/FREIN`, `/SLIP` vs `/PATINAGE`, …). The
+OpenVMS verbs (`SHOW`, `SET`, `MONITOR`, …) and the VALCP product nouns
+(`RAME`, `RAMES`, `STATIONS`, `PAX`) are the installed CLI vocabulary and
+work in either mode.
 
 ## Credits
 

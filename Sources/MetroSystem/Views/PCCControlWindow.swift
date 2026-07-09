@@ -59,7 +59,18 @@ struct PCCControlWindow: View {
         .frame(minWidth: 980, minHeight: 680)
         .environment(\.colorScheme, .dark)
         .navigationTitle(language.t("window.control"))
-        .onAppear { ensureFocus() }
+        .onAppear {
+            ensureFocus()
+            // Demo / screenshot affordance: `-openDetail` auto-pops the
+            // first train's detail window shortly after launch.
+            if ProcessInfo.processInfo.arguments.contains("-openDetail") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    if let first = world.sortedTrains.first {
+                        openWindow(id: "train-detail", value: first.id)
+                    }
+                }
+            }
+        }
         .onChange(of: world.trains.map(\.id)) { ensureFocus() }
     }
 
@@ -653,6 +664,7 @@ private struct TrainPanel: View {
     @EnvironmentObject var world: MetroWorld
     @EnvironmentObject var network: PeerNetwork
     @EnvironmentObject var language: AppLanguage
+    @Environment(\.openWindow) private var openWindow
 
     private var isLocal: Bool { world.canControl(train) }
 
@@ -701,6 +713,9 @@ private struct TrainPanel: View {
                     DoorControls(train: train)
                     ModeControls(train: train)
                     Spacer()
+                    RetroButton(language.t("btn.detail")) {
+                        openWindow(id: "train-detail", value: train.id)
+                    }
                     RetroButton(language.t("btn.fu"),
                                 enabled: network.canControl(train),
                                 highlighted: train.isEmergencyBrakeApplied) {
