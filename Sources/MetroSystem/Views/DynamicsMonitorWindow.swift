@@ -29,13 +29,27 @@ struct DynamicsMonitorWindow: View {
     // Window-local fonts: the global RetroTheme.mono/monoSm are tuned
     // for dense panels (control panel, alarm table); this window is
     // viewed from further back during a demo, so the table and labels
-    // get bumped up a tier without affecting the rest of the app.
-    private static let bodyFont = Font.custom(RetroTheme.retroFontName,
-                                              size: 19, relativeTo: .body)
-    private static let smallFont = Font.custom(RetroTheme.retroFontName,
-                                               size: 16, relativeTo: .footnote)
-    private static let titleFont = Font.custom(RetroTheme.retroFontName,
-                                               size: 26, relativeTo: .title3)
+    // get bumped up a tier without affecting the rest of the app. Like
+    // RetroTheme they follow the active skin: the VT323 bitmap face under
+    // retro, the system monospace (at slightly smaller sizes) under ISA-101.
+    private static var bodyFont: Font {
+        switch RetroTheme.kind {
+        case .retro:  return Font.custom(RetroTheme.retroFontName, size: 19, relativeTo: .body)
+        case .iso101: return Font.system(size: 15, design: .monospaced)
+        }
+    }
+    private static var smallFont: Font {
+        switch RetroTheme.kind {
+        case .retro:  return Font.custom(RetroTheme.retroFontName, size: 16, relativeTo: .footnote)
+        case .iso101: return Font.system(size: 12.5, design: .monospaced)
+        }
+    }
+    private static var titleFont: Font {
+        switch RetroTheme.kind {
+        case .retro:  return Font.custom(RetroTheme.retroFontName, size: 26, relativeTo: .title3)
+        case .iso101: return Font.system(size: 20, weight: .semibold, design: .monospaced)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -75,7 +89,8 @@ struct DynamicsMonitorWindow: View {
             .padding(20)
         }
         .frame(minWidth: 760, minHeight: 560)
-        .environment(\.colorScheme, .dark)
+        .id(language.themeKind)
+        .environment(\.colorScheme, language.themeKind == .retro ? .dark : .light)
         .navigationTitle(language.t("window.dynamics"))
         .onAppear { sample() }
         .task {
