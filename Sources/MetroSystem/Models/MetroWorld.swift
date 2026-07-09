@@ -263,6 +263,7 @@ final class MetroWorld: ObservableObject {
                 t.dwellRemaining = 0
                 t.paxRemaining = 0
             case .fuSet:
+                if !t.isEmergencyBrakeApplied { t.emergencyBrakeCounter += 1 }
                 t.isEmergencyBrakeApplied = true
             case .fuRelease:
                 t.isEmergencyBrakeApplied = false
@@ -774,6 +775,26 @@ final class MetroWorld: ObservableObject {
         if train.compressorPressure < 7.4 { train.isCompressorRunning = true }
         if train.compressorPressure > 9.0 { train.isCompressorRunning = false }
         train.compressorPressure = max(6.0, min(9.5, train.compressorPressure))
+
+        // Static converter (CVS): ~112 V DC low-voltage bus while the 750 V
+        // line is up; it sags if third-rail pickup collapses.
+        train.cvsOutputVoltage = train.mainVoltage > 400
+            ? 112.0 - (750 - train.mainVoltage) * 0.01
+            : max(0, train.cvsOutputVoltage - 40 * dt)
+        // Lighting circuit draw follows the lamps and DELESTAGE BT shedding.
+        train.lightingCurrent = train.areLightsOn
+            ? (train.isLoadSheddingActive ? 5.0 : 15.0)
+            : 0.0
+        // Friction-brake box heats under service/emergency braking, cools
+        // otherwise (bounded to a plausible TCMS range).
+        let brakeHeat = (braking || train.isEmergencyBrakeApplied) ? 14.0 : -6.0
+        train.brakeBoxTemperature = max(30, min(140, train.brakeBoxTemperature + brakeHeat * dt))
+        // Cabin temperature drifts toward the HVAC setpoint; load shedding
+        // parks ventilation so it drifts a few degrees warm.
+        let comfortTarget = train.targetTemperature + (train.isLoadSheddingActive ? 3.0 : 0.0)
+        train.interiorTemperature += (comfortTarget - train.interiorTemperature) * 0.02
+        // RAZ MULTIMEDIA is momentary: the reset self-clears once acknowledged.
+        if train.isMultimediaResetting { train.isMultimediaResetting = false }
     }
 
     // MARK: -- safety chain (shared by Modbus DI and the alarm samplers)

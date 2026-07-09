@@ -118,13 +118,31 @@ struct Train: Identifiable, Hashable, Codable {
     var tires: [Tire] = (1...Sim.tireCount).map { Tire(id: $0) }
 
     // Auxiliary systems (synoptic data).
-    var mainVoltage: Double = 750.0
+    var mainVoltage: Double = 750.0            // third-rail 750 V DC bus
     var batteryVoltage: Double = 76.5
+    var cvsOutputVoltage: Double = 112.0       // static converter (CVS) LV output
     var tractionCurrent: Double = 0
     var tractionTorque: Double = 0     // percent, -100..100
+    var lightingCurrent: Double = 15.0         // ECLAIRAGE circuit draw (A)
     var compressorPressure: Double = 8.5
     var isCompressorRunning: Bool = false
     var interiorTemperature: Double = 22.0
+    var targetTemperature: Double = 22.0       // HVAC setpoint
+    var brakeBoxTemperature: Double = 35.0     // TEMP COFFRE-FREIN (°C)
+
+    // Auxiliary control states -- owner-driven telecommands mirrored from the
+    // DC CBTC train-detail screen. Toggled through `MetroWorld.mutate` and
+    // carried on the peer wire so a rame's synoptic reads the same everywhere.
+    var isLoadSheddingActive: Bool = false     // DELESTAGE BT
+    var areLightsOn: Bool = true               // ECLAIRAGE
+    var areVentilated: Bool = true             // VENTILATION
+    var isHeating: Bool = true                 // CHAUFFAGE
+    var isSuspensionActive: Bool = true        // SUSPENSION (air-spring levelling)
+    var emergencyBrakeCounter: Int = 0         // COMPTEUR FU (application count)
+    var isMultimediaResetting: Bool = false    // RAZ MULTIMEDIA
+    var isSoundSystemActive: Bool = true       // TEST SONORISATION
+    var isVideoSystemInitialized: Bool = true  // INIT SYSTÈME VIDÉO
+    var isArchiving: Bool = false              // ENR ARCHIVAGE DAM
 
     enum CodingKeys: String, CodingKey {
         case id, label, ownerPeerId, position, speed, acceleration
@@ -136,8 +154,13 @@ struct Train: Identifiable, Hashable, Codable {
         case isDoorFault, isEngineFault, isBrakeFault, isSignalFault
         case isPatinage, isEnrayage, isEmergencyBrakeApplied
         case consigneVitesse, speedError, distanceToMA, tires
-        case mainVoltage, batteryVoltage, tractionCurrent, tractionTorque
-        case compressorPressure, isCompressorRunning, interiorTemperature
+        case mainVoltage, batteryVoltage, cvsOutputVoltage
+        case tractionCurrent, tractionTorque, lightingCurrent
+        case compressorPressure, isCompressorRunning
+        case interiorTemperature, targetTemperature, brakeBoxTemperature
+        case isLoadSheddingActive, areLightsOn, areVentilated, isHeating
+        case isSuspensionActive, emergencyBrakeCounter, isMultimediaResetting
+        case isSoundSystemActive, isVideoSystemInitialized, isArchiving
     }
 
     init(id: UUID, label: String, ownerPeerId: String, position: Double) {
@@ -186,17 +209,46 @@ struct Train: Identifiable, Hashable, Codable {
             ?? (1...Sim.tireCount).map { Tire(id: $0) }
         mainVoltage = try c.decodeIfPresent(Double.self, forKey: .mainVoltage) ?? 750.0
         batteryVoltage = try c.decodeIfPresent(Double.self, forKey: .batteryVoltage) ?? 76.5
+        cvsOutputVoltage = try c.decodeIfPresent(Double.self, forKey: .cvsOutputVoltage) ?? 112.0
         tractionCurrent = try c.decodeIfPresent(Double.self, forKey: .tractionCurrent) ?? 0
         tractionTorque = try c.decodeIfPresent(Double.self, forKey: .tractionTorque) ?? 0
+        lightingCurrent = try c.decodeIfPresent(Double.self, forKey: .lightingCurrent) ?? 15.0
         compressorPressure = try c.decodeIfPresent(Double.self, forKey: .compressorPressure) ?? 8.5
         isCompressorRunning = try c.decodeIfPresent(Bool.self, forKey: .isCompressorRunning) ?? false
         interiorTemperature = try c.decodeIfPresent(Double.self, forKey: .interiorTemperature) ?? 22.0
+        targetTemperature = try c.decodeIfPresent(Double.self, forKey: .targetTemperature) ?? 22.0
+        brakeBoxTemperature = try c.decodeIfPresent(Double.self, forKey: .brakeBoxTemperature) ?? 35.0
+        isLoadSheddingActive = try c.decodeIfPresent(Bool.self, forKey: .isLoadSheddingActive) ?? false
+        areLightsOn = try c.decodeIfPresent(Bool.self, forKey: .areLightsOn) ?? true
+        areVentilated = try c.decodeIfPresent(Bool.self, forKey: .areVentilated) ?? true
+        isHeating = try c.decodeIfPresent(Bool.self, forKey: .isHeating) ?? true
+        isSuspensionActive = try c.decodeIfPresent(Bool.self, forKey: .isSuspensionActive) ?? true
+        emergencyBrakeCounter = try c.decodeIfPresent(Int.self, forKey: .emergencyBrakeCounter) ?? 0
+        isMultimediaResetting = try c.decodeIfPresent(Bool.self, forKey: .isMultimediaResetting) ?? false
+        isSoundSystemActive = try c.decodeIfPresent(Bool.self, forKey: .isSoundSystemActive) ?? true
+        isVideoSystemInitialized = try c.decodeIfPresent(Bool.self, forKey: .isVideoSystemInitialized) ?? true
+        isArchiving = try c.decodeIfPresent(Bool.self, forKey: .isArchiving) ?? false
     }
 
     var displayName: String { "Rame \(label)" }
 
     /// Signed speed (m/s) for scopes: positive in the forward running sense.
     var signedSpeed: Double { speed * travelDirection.rawValue }
+
+    /// DELESTAGE BT: shedding the low-voltage load dims the lighting circuit
+    /// and drops non-vital ventilation (the coupling the DC CBTC detail
+    /// screen shows when load shedding is engaged); releasing it restores
+    /// nominal lighting and ventilation.
+    mutating func setLoadShedding(_ on: Bool) {
+        isLoadSheddingActive = on
+        if on {
+            lightingCurrent = 5.0
+            areVentilated = false
+        } else {
+            lightingCurrent = areLightsOn ? 15.0 : 0.0
+            areVentilated = true
+        }
+    }
 
     mutating func cycleTireStatus(at index: Int) {
         guard tires.indices.contains(index) else { return }

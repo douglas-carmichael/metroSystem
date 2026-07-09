@@ -58,6 +58,8 @@ struct TrainDetailWindow: View {
                     ATPSection(train: train)
                     AuxiliarySection(train: train)
                 }
+                ElectricalSynopticSection(train: train)
+                AuxControlsSection(train: train, editable: isLocal)
                 PneumaticsSection(train: train, editable: isLocal)
                 DiagnosticFooter(train: train)
             }
@@ -438,17 +440,293 @@ private struct AuxiliarySection: View {
             VStack(alignment: .leading, spacing: 6) {
                 ValueRow(label: language.t("detail.aux.mainv"),
                          value: String(format: "%.0f V", train.mainVoltage))
+                ValueRow(label: language.t("detail.aux.cvs"),
+                         value: String(format: "%.0f V", train.cvsOutputVoltage))
                 ValueRow(label: language.t("detail.aux.battery"),
                          value: String(format: "%.1f V", train.batteryVoltage))
+                ValueRow(label: language.t("detail.aux.lighting"),
+                         value: String(format: "%.1f A", train.lightingCurrent),
+                         color: train.areLightsOn ? RetroTheme.amberBright : RetroTheme.amberDim)
                 ValueRow(label: language.t("detail.aux.compressor"),
                          value: String(format: "%.1f bar", train.compressorPressure))
-                IndicatorRow(label: language.t("detail.aux.comprun"),
-                             active: train.isCompressorRunning, color: RetroTheme.green)
+                ValueRow(label: language.t("detail.aux.brakebox"),
+                         value: String(format: "%.0f °C", train.brakeBoxTemperature),
+                         color: train.brakeBoxTemperature > 110 ? .red : RetroTheme.amberBright)
                 ValueRow(label: language.t("detail.aux.temp"),
-                         value: String(format: "%.0f °C", train.interiorTemperature))
+                         value: String(format: "%.0f °C  (SP %.0f)", train.interiorTemperature, train.targetTemperature))
             }
             .frame(maxWidth: .infinity)
         }
+    }
+}
+
+// MARK: - Auxiliary controls (owner-driven telecommands)
+
+/// The DC CBTC train-detail auxiliary controls: DELESTAGE BT and the other
+/// subsystem toggles plus the momentary telecommands (RAZ MULTIMEDIA, ACQUIT
+/// COMPTEUR FU, …). Every action routes through `MetroWorld.mutate`, so the
+/// block is live only for a locally-owned rame; on a REMOTE rame the controls
+/// render disabled with a read-only banner.
+private struct AuxControlsSection: View {
+    let train: Train
+    let editable: Bool
+    @EnvironmentObject var world: MetroWorld
+    @EnvironmentObject var language: AppLanguage
+
+    var body: some View {
+        BoxPanel(title: language.t("detail.sec.controls"), accent: RetroTheme.cyan) {
+            VStack(alignment: .leading, spacing: 10) {
+                // Subsystem toggles.
+                FlowLayout(horizontalSpacing: 10, verticalSpacing: 8) {
+                    AuxControlButton(label: language.t("ctl.delestage"),
+                                     active: train.isLoadSheddingActive,
+                                     enabled: editable, onColor: RetroTheme.red) {
+                        world.mutate(train.id) { $0.setLoadShedding(!$0.isLoadSheddingActive) }
+                    }
+                    AuxControlButton(label: language.t("ctl.eclairage"),
+                                     active: train.areLightsOn,
+                                     enabled: editable, onColor: RetroTheme.green) {
+                        world.mutate(train.id) { $0.areLightsOn.toggle() }
+                    }
+                    AuxControlButton(label: language.t("ctl.ventilation"),
+                                     active: train.areVentilated,
+                                     enabled: editable, onColor: RetroTheme.green) {
+                        world.mutate(train.id) { $0.areVentilated.toggle() }
+                    }
+                    AuxControlButton(label: language.t("ctl.chauffage"),
+                                     active: train.isHeating,
+                                     enabled: editable, onColor: RetroTheme.amber) {
+                        world.mutate(train.id) { $0.isHeating.toggle() }
+                    }
+                    AuxControlButton(label: language.t("ctl.suspension"),
+                                     active: train.isSuspensionActive,
+                                     enabled: editable, onColor: RetroTheme.green) {
+                        world.mutate(train.id) { $0.isSuspensionActive.toggle() }
+                    }
+                    AuxControlButton(label: language.t("ctl.compresseur"),
+                                     active: train.isCompressorRunning,
+                                     enabled: editable, onColor: RetroTheme.green) {
+                        world.mutate(train.id) { $0.isCompressorRunning.toggle() }
+                    }
+                }
+                HRule(RetroTheme.amberDim)
+                // Momentary telecommands.
+                FlowLayout(horizontalSpacing: 10, verticalSpacing: 8) {
+                    RetroButton(language.t("ctl.razmultimedia"), enabled: editable) {
+                        world.mutate(train.id) { $0.isMultimediaResetting = true }
+                    }
+                    RetroButton("\(language.t("ctl.acquitfu")) [\(train.emergencyBrakeCounter)]",
+                                enabled: editable) {
+                        world.mutate(train.id) { $0.emergencyBrakeCounter = 0 }
+                    }
+                    RetroButton(language.t("ctl.sonorisation"),
+                                enabled: editable, highlighted: train.isSoundSystemActive) {
+                        world.mutate(train.id) { $0.isSoundSystemActive.toggle() }
+                    }
+                    RetroButton(language.t("ctl.videoinit"),
+                                enabled: editable, highlighted: !train.isVideoSystemInitialized) {
+                        world.mutate(train.id) { $0.isVideoSystemInitialized.toggle() }
+                    }
+                    RetroButton(language.t("ctl.archivage"),
+                                enabled: editable, highlighted: train.isArchiving) {
+                        world.mutate(train.id) { $0.isArchiving.toggle() }
+                    }
+                }
+                if !editable {
+                    Text(language.t("detail.controls.remote"))
+                        .font(RetroTheme.monoSm)
+                        .foregroundColor(RetroTheme.amberDim)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// A latching subsystem toggle: an indicator lamp (lit in `onColor` when the
+/// system is engaged) beside its label, framed as a pressable cell.
+private struct AuxControlButton: View {
+    let label: String
+    let active: Bool
+    let enabled: Bool
+    let onColor: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: { if enabled { action() } }) {
+            HStack(spacing: 6) {
+                Rectangle()
+                    .fill(active ? onColor : Color.clear)
+                    .overlay(Rectangle().stroke(active ? onColor : RetroTheme.amberDim, lineWidth: 1))
+                    .frame(width: 10, height: 10)
+                Text(label)
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(enabled ? RetroTheme.amber : RetroTheme.amberDim)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .overlay(
+                Rectangle().stroke(
+                    enabled ? (active ? onColor.opacity(0.8) : RetroTheme.amber.opacity(0.7))
+                            : RetroTheme.amberDim.opacity(0.5),
+                    lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+}
+
+// MARK: - Electrical system diagram (synoptic)
+
+/// The rame's low-voltage electrical synoptic, after the DC CBTC auxiliary
+/// diagram: the two 750 V third-rail shoes feeding the bus, the static
+/// converter (CVS) and motor-alternator/compressor group, the battery, and
+/// the DELESTAGE BT contact that visibly opens when load shedding is engaged,
+/// dropping the lighting and ventilation loads. Node labels localise EN / FR.
+private struct ElectricalSynopticSection: View {
+    let train: Train
+    @EnvironmentObject var language: AppLanguage
+
+    var body: some View {
+        BoxPanel(title: language.t("detail.sec.diagram"), accent: RetroTheme.green) {
+            GeometryReader { proxy in
+                let s = proxy.size
+                ZStack {
+                    wiring(size: s)
+                    // 750 V line pickup shoes.
+                    DiagNode(title: language.t("detail.node.shoel"),
+                             value: String(format: "%.0f V", train.mainVoltage),
+                             color: RetroTheme.red, x: 0.06, y: 0.80, size: s)
+                    DiagNode(title: language.t("detail.node.shoer"),
+                             value: String(format: "%.0f V", train.mainVoltage),
+                             color: RetroTheme.red, x: 0.94, y: 0.80, size: s)
+                    // Static converter and motor-alternator/compressor group.
+                    DiagNode(title: language.t("detail.node.cvs"),
+                             value: String(format: "%.0f V", train.cvsOutputVoltage),
+                             color: RetroTheme.cyan, x: 0.30, y: 0.40, size: s)
+                    DiagNode(title: language.t("detail.node.compressor"),
+                             value: train.isCompressorRunning ? language.t("detail.atp.ok").replacingOccurrences(of: "OK", with: "ON") : "OFF",
+                             color: train.isCompressorRunning ? RetroTheme.green : RetroTheme.amberDim,
+                             x: 0.70, y: 0.40, size: s)
+                    // Battery and main reservoir.
+                    DiagNode(title: language.t("detail.node.battery"),
+                             value: String(format: "%.1f V", train.batteryVoltage),
+                             color: RetroTheme.cyan, x: 0.50, y: 0.62, size: s)
+                    DiagNode(title: language.t("detail.node.reservoir"),
+                             value: String(format: "%.1f bar", train.compressorPressure),
+                             color: RetroTheme.cyan, x: 0.70, y: 0.62, size: s)
+                    // DELESTAGE BT contact state.
+                    DiagNode(title: language.t("detail.node.delestage"),
+                             value: train.isLoadSheddingActive ? "ACT" : "—",
+                             color: train.isLoadSheddingActive ? RetroTheme.red : RetroTheme.greenDim,
+                             x: 0.30, y: 0.75, size: s)
+                    // Shed loads.
+                    DiagLamp(title: language.t("detail.node.lighting"),
+                             active: train.areLightsOn, x: 0.10, y: 0.90, size: s)
+                    DiagLamp(title: language.t("detail.node.ventilation"),
+                             active: train.areVentilated, x: 0.24, y: 0.90, size: s)
+                }
+            }
+            .frame(height: 250)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// The wiring net drawn in phosphor green, with the DELESTAGE BT contact
+    /// rendered closed (green segment) or open (red swung blade).
+    private func wiring(size: CGSize) -> some View {
+        let shed = train.isLoadSheddingActive
+        return Canvas { ctx, sz in
+            let w = sz.width, h = sz.height
+            func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: w * x, y: h * y) }
+            var net = Path()
+            // Third-rail shoes up to the 750 V bus.
+            net.move(to: p(0.06, 0.86)); net.addLine(to: p(0.12, 0.86)); net.addLine(to: p(0.12, 0.18))
+            net.move(to: p(0.94, 0.86)); net.addLine(to: p(0.88, 0.86)); net.addLine(to: p(0.88, 0.18))
+            // 750 V bus.
+            net.move(to: p(0.12, 0.18)); net.addLine(to: p(0.88, 0.18))
+            // Drops to CVS and compressor group.
+            net.move(to: p(0.30, 0.18)); net.addLine(to: p(0.30, 0.33))
+            net.move(to: p(0.70, 0.18)); net.addLine(to: p(0.70, 0.33))
+            // CVS output to battery and LV bus.
+            net.move(to: p(0.30, 0.47)); net.addLine(to: p(0.30, 0.62)); net.addLine(to: p(0.44, 0.62))
+            net.move(to: p(0.30, 0.62)); net.addLine(to: p(0.18, 0.62)); net.addLine(to: p(0.18, 0.72))
+            // Compressor group to reservoir.
+            net.move(to: p(0.70, 0.47)); net.addLine(to: p(0.70, 0.56))
+            // Below the DELESTAGE contact: LV loads.
+            net.move(to: p(0.18, 0.79)); net.addLine(to: p(0.18, 0.86))
+            net.addLine(to: p(0.10, 0.86))
+            net.move(to: p(0.18, 0.86)); net.addLine(to: p(0.24, 0.86))
+            ctx.stroke(net, with: .color(RetroTheme.green.opacity(0.85)), lineWidth: 1.5)
+            // DELESTAGE BT contact.
+            let top = p(0.18, 0.72), bot = p(0.18, 0.79)
+            var contact = Path()
+            if shed {
+                contact.move(to: top)
+                contact.addLine(to: CGPoint(x: top.x + w * 0.05, y: (top.y + bot.y) / 2))
+                ctx.stroke(contact, with: .color(RetroTheme.red), lineWidth: 2)
+            } else {
+                contact.move(to: top); contact.addLine(to: bot)
+                ctx.stroke(contact, with: .color(RetroTheme.green), lineWidth: 2)
+            }
+            // Contact pads.
+            for pt in [top, bot] {
+                let r = CGRect(x: pt.x - 2, y: pt.y - 2, width: 4, height: 4)
+                ctx.fill(Path(ellipseIn: r), with: .color(RetroTheme.amber))
+            }
+        }
+    }
+}
+
+/// A labelled box on the electrical synoptic, positioned by fractional
+/// coordinates within the diagram canvas.
+private struct DiagNode: View {
+    let title: String
+    let value: String
+    let color: Color
+    let x: CGFloat
+    let y: CGFloat
+    let size: CGSize
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(title)
+                .font(RetroTheme.monoSm)
+                .foregroundColor(RetroTheme.amber)
+            Text(value)
+                .font(RetroTheme.monoSm)
+                .foregroundColor(color)
+        }
+        .fixedSize()
+        .padding(.horizontal, 5)
+        .padding(.vertical, 3)
+        .background(RetroTheme.bg)
+        .overlay(Rectangle().stroke(color.opacity(0.8), lineWidth: 1))
+        .position(x: size.width * x, y: size.height * y)
+    }
+}
+
+/// A load lamp on the electrical synoptic: filled when the load is energised.
+private struct DiagLamp: View {
+    let title: String
+    let active: Bool
+    let x: CGFloat
+    let y: CGFloat
+    let size: CGSize
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Circle()
+                .fill(active ? RetroTheme.amber : Color.clear)
+                .overlay(Circle().stroke(active ? RetroTheme.amber : RetroTheme.amberDim, lineWidth: 1))
+                .frame(width: 16, height: 16)
+            Text(title)
+                .font(RetroTheme.monoSm)
+                .foregroundColor(active ? RetroTheme.amber : RetroTheme.amberDim)
+        }
+        .fixedSize()
+        .position(x: size.width * x, y: size.height * y)
     }
 }
 
