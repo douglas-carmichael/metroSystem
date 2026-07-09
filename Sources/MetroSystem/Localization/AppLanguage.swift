@@ -36,9 +36,30 @@ final class AppLanguage: ObservableObject {
     /// terminology follows `current`: FR → EN 62290, EN → IEEE 1474.
     @Published var standardOverride: SafetyStandard?
 
+    /// Active display skin. Publishing it re-renders every localized view
+    /// (they all observe this object) and the `didSet` keeps the static
+    /// `RetroTheme.kind` — which the palette accessors read — in step.
+    @Published var themeKind: ThemeKind = .retro {
+        didSet { RetroTheme.kind = themeKind }
+    }
+
     init(initial: Lang = AppLanguage.detect()) {
         self.current = initial
         self.standardOverride = nil
+        // Optional launch override: `-theme iso|hmi|retro` (used to capture
+        // each skin headlessly, since UI automation is TCC-blocked). Property
+        // observers don't fire during init, so sync RetroTheme explicitly.
+        if let i = CommandLine.arguments.firstIndex(of: "-theme"),
+           CommandLine.arguments.indices.contains(i + 1) {
+            let v = CommandLine.arguments[i + 1].lowercased()
+            if v.hasPrefix("iso") || v == "hmi" { themeKind = .iso101 }
+        }
+        RetroTheme.kind = themeKind
+    }
+
+    /// Flip between the retro phosphor and ISA-101 high-performance skins.
+    func toggleTheme() {
+        themeKind = (themeKind == .retro) ? .iso101 : .retro
     }
 
     /// The CBTC standard currently in effect, honouring an explicit

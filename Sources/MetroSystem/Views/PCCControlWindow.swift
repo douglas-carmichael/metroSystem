@@ -57,7 +57,8 @@ struct PCCControlWindow: View {
             }
         }
         .frame(minWidth: 980, minHeight: 680)
-        .environment(\.colorScheme, .dark)
+        .id(language.themeKind)
+        .environment(\.colorScheme, language.themeKind == .retro ? .dark : .light)
         .navigationTitle(language.t("window.control"))
         .onAppear {
             ensureFocus()
@@ -198,6 +199,13 @@ private struct BannerHeader: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
         .overlay(Rectangle().stroke(RetroTheme.amber, lineWidth: 1))
+        .overlay(alignment: .topTrailing) {
+            RetroButton("\(language.t("theme.label")): \(language.t(language.themeKind == .retro ? "theme.retro" : "theme.iso"))",
+                        highlighted: language.themeKind == .iso101) {
+                language.toggleTheme()
+            }
+            .padding(6)
+        }
     }
 }
 
