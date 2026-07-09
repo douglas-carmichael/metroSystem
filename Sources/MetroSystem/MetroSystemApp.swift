@@ -1,0 +1,150 @@
+import SwiftUI
+import AppKit
+
+@main
+struct MetroSystemApp: App {
+    @StateObject private var language: AppLanguage
+    @StateObject private var world: MetroWorld
+    @StateObject private var telnet: DCLTelnetServer
+    @StateObject private var sessions = DCLSessionCoordinator()
+
+    init() {
+        _language = StateObject(wrappedValue: AppLanguage())
+        _world = StateObject(wrappedValue: MetroWorld())
+        _telnet = StateObject(wrappedValue: DCLTelnetServer())
+    }
+
+    var body: some Scene {
+        WindowGroup("PCC Dispatcher", id: "control") {
+            PCCControlWindow()
+                .environmentObject(language)
+                .environmentObject(world)
+                .environmentObject(telnet)
+                .onAppear { bootstrap() }
+        }
+        .windowResizability(.contentMinSize)
+        .restorationDisabled()
+        .commands {
+            // Replace the standard File > New with an opener that spawns a
+            // fresh DCL terminal session (each carries its own DCLEngine).
+            CommandGroup(replacing: .newItem) {
+                NewTerminalCommand()
+            }
+        }
+
+        WindowGroup("Line Synoptic 3D", id: "scene") {
+            MetroSceneWindow()
+                .environmentObject(language)
+                .environmentObject(world)
+        }
+        .windowResizability(.contentMinSize)
+        .restorationDisabled()
+
+        // Data-driven group keyed by DCLSessionID: each distinct session id
+        // opens a separate window, and DCLShellWindow gives each one its own
+        // DCLEngine -- so terminals are fully independent logins (separate
+        // transcript / symbols / history / MAIL browse state), the same way
+        // each telnet connection already gets its own engine.
+        WindowGroup("DCL Terminal", id: "dcl", for: DCLSessionID.self) { _ in
+            DCLShellWindow()
+                .environmentObject(language)
+                .environmentObject(world)
+                .environmentObject(sessions)
+        } defaultValue: {
+            DCLSessionID()
+        }
+        .windowResizability(.contentMinSize)
+        .restorationDisabled()
+
+        WindowGroup("Rame Dynamics", id: "dynamics") {
+            DynamicsMonitorWindow()
+                .environmentObject(language)
+                .environmentObject(world)
+        }
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 900, height: 900)
+        .restorationDisabled()
+    }
+
+    private func bootstrap() {
+        guard world.trains.isEmpty else { return }
+        if let other = otherRunningInstance() {
+            refuseDuplicateLaunch(other: other)
+            return
+        }
+        world.seedTrains()
+        world.start()
+        telnet.attach(world: world, language: language, sessionCoordinator: sessions)
+        telnet.start()
+    }
+
+    /// Looks for another running MetroSystem process on this Mac. A second
+    /// instance would fail to bind the telnet port and fight over the shared
+    /// COM store, so refuse the duplicate launch outright.
+    ///
+    /// `isFinishedLaunching` filters out app entries that NSWorkspace
+    /// reports transiently during macOS session restore -- if we don't
+    /// require the other instance to be fully launched, a system-restored
+    /// ghost can cause every fresh launch to false-positive on itself.
+    private func otherRunningInstance() -> NSRunningApplication? {
+        guard let bundleId = Bundle.main.bundleIdentifier else { return nil }
+        let mine = ProcessInfo.processInfo.processIdentifier
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+            .first { $0.processIdentifier != mine && $0.isFinishedLaunching }
+    }
+
+    private func refuseDuplicateLaunch(other: NSRunningApplication) {
+        // Defer the modal + terminate so we're running OUTSIDE the AppKit
+        // / Core Animation transaction that the .onAppear that called us
+        // is nested inside. NSAlert.runModal() is suppressed inside a CA
+        // transaction, which would silently drop the alert.
+        let pid = other.processIdentifier
+        let info = """
+            Only one PCC node may run on this Mac at a time. The existing \
+            instance (pid \(pid)) will keep running; this launch will quit.
+            """
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.alertStyle = .critical
+            alert.messageText = "Another MetroSystem instance is already running"
+            alert.informativeText = info
+            alert.addButton(withTitle: "Quit")
+            alert.addButton(withTitle: "Activate Existing")
+            let response = alert.runModal()
+            if response == .alertSecondButtonReturn {
+                other.activate()
+            }
+            NSApp.terminate(nil)
+        }
+    }
+}
+
+private extension Scene {
+    // Opts each WindowGroup out of macOS session restore so the app
+    // launches in its declared layout rather than reopening whatever the
+    // user last had on screen.
+    func restorationDisabled() -> some Scene {
+        self.restorationBehavior(.disabled)
+    }
+}
+
+/// Identifies one DCL terminal window. Each distinct value drives a
+/// separate window in the "dcl" WindowGroup; the fresh UUID means every
+/// open request spawns a new, independent session rather than re-focusing
+/// an existing one (SwiftUI only reuses a window when the presented value
+/// matches one already on screen).
+struct DCLSessionID: Hashable, Codable {
+    var id: UUID = UUID()
+}
+
+/// File menu command that opens a brand-new DCL terminal session. Lives in
+/// a view so it can read the `openWindow` action from the environment.
+private struct NewTerminalCommand: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Button("New DCL Terminal") {
+            openWindow(id: "dcl", value: DCLSessionID())
+        }
+        .keyboardShortcut("t", modifiers: [.command, .shift])
+    }
+}

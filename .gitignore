@@ -1,0 +1,14 @@
+# XcodeGen output -- regenerate with `xcodegen generate`
+MetroSystem.xcodeproj/
+
+# Xcode build products
+build/
+DerivedData/
+
+# Logs / scratch
+*.log
+*.txt
+!Resources/Fonts/OFL.txt
+
+# Mac
+.DS_Store
