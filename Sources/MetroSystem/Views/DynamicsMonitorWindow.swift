@@ -88,7 +88,10 @@ struct DynamicsMonitorWindow: View {
             }
             .padding(20)
         }
-        .frame(minWidth: 760, minHeight: 560)
+        // Minimum matches the window's default size (see .defaultSize in the
+        // app): the table columns and trace stop being legible below this, so
+        // the window opens at its minimum and only grows.
+        .frame(minWidth: 900, minHeight: 900)
         .id(language.themeKind)
         .environment(\.colorScheme, language.themeKind == .retro ? .dark : .light)
         .navigationTitle(language.t("window.dynamics"))
@@ -218,6 +221,7 @@ struct DynamicsMonitorWindow: View {
         Text(text)
             .font(Self.bodyFont)
             .foregroundColor(RetroTheme.amberDim)
+            .lineLimit(1)
             .frame(width: width, alignment: .leading)
     }
 
@@ -244,6 +248,7 @@ struct DynamicsMonitorWindow: View {
         Text(text)
             .font(Self.bodyFont)
             .foregroundColor(color)
+            .lineLimit(1)
             .frame(width: width, alignment: .leading)
     }
 
