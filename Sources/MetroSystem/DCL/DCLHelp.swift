@@ -247,7 +247,7 @@ extension DCLEngine {
         let verbs: [String] = [
             "SHOW PROCESS", "SHOW PROCESS/ALL",
             "SHOW SYSTEM", "SHOW USERS", "SHOW DEVICES", "SHOW MEMORY",
-            "SHOW TIME", "SHOW NETWORK", "SHOW RAMES", "SHOW ALARMS",
+            "SHOW MODBUS", "SHOW TIME", "SHOW NETWORK", "SHOW RAMES", "SHOW ALARMS",
             "SHOW RAME 101", "SHOW LIGNE", "SHOW STATIONS", "SHOW PAX",
             "SHOW SYSTEM/PAGE",
             "SHOW LOGICAL", "SHOW LOGICAL/PROCESS",

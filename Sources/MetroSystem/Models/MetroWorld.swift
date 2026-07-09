@@ -12,6 +12,14 @@ import Combine
 // processors with hardware voting; THIS code models the behaviour so the
 // PCC panels and SCADA log read like the real thing, but nothing here is
 // approved to move a train.
+//
+// MULTI-NODE: every rame carries an `ownerPeerId`. This node's OBCU logic
+// advances only the rames it owns; rames owned by a peer (another app, or
+// a ClusterDaemon node) arrive over the wire as `.state` snapshots and are
+// dead-reckoned between snapshots. The ZC pass considers ALL rames as
+// obstacles but assigns movement authority only to locally-owned ones --
+// each node protects its own trains against the whole picture, exactly one
+// authority per train.
 
 /// Line-wide operating mode, derived from the world's switches.
 enum LineMode: String {
@@ -84,6 +92,9 @@ final class MetroWorld: ObservableObject {
     @Published var activeSP: ServiceProvisoire? = nil
     @Published private(set) var alarmLog: [SCADAAlarm] = []
 
+    @Published var localPeerId: String
+    @Published var localPeerLabel: String
+
     let cantons: [Canton]
     let stations: [Station]
 
@@ -95,13 +106,23 @@ final class MetroWorld: ObservableObject {
     /// SP interval pacing: last departure timestamp per terminus station.
     private var lastTerminusDeparture: [Int: Date] = [:]
 
+    /// Fired after every locally-owned mutation (operator action) so the
+    /// peer link can push the fresh `.state` immediately. The 10 Hz
+    /// periodic rebroadcast in PeerNetwork covers physics motion.
+    var onLocalChange: ((Train) -> Void)?
+    /// Fired when a locally-owned rame is withdrawn, so peers drop it too.
+    var onLocalRemove: ((UUID) -> Void)?
+
     var lineMode: LineMode {
         if isEmergencyStopped { return .emergency }
         if activeSP != nil { return .serviceProvisoire }
         return isRunning ? .normal : .stopped
     }
 
-    init() {
+    init(localPeerId: String = UUID().uuidString,
+         localPeerLabel: String = Host.current().localizedName ?? "PCC") {
+        self.localPeerId = localPeerId
+        self.localPeerLabel = localPeerLabel
         self.cantons = (0..<Sim.cantonCount).map { i in
             Canton(id: i + 1,
                    name: "Canton \(i + 1)",
@@ -136,14 +157,16 @@ final class MetroWorld: ObservableObject {
 
     @discardableResult
     func addTrain() -> Train? {
-        guard trains.count < Sim.maxTrainCount else { return nil }
+        guard locallyOwned().count < Sim.maxTrainCount else { return nil }
         // Spawn docked at the station farthest from every existing train
-        // so a new rame never materialises inside another's MA envelope.
+        // (local or remote) so a new rame never materialises inside
+        // another's MA envelope.
         let candidates = activeStations()
         let spawn = candidates.max { a, b in
             nearestTrainDistance(to: a.position) < nearestTrainDistance(to: b.position)
         } ?? stations[0]
-        var t = Train(id: UUID(), label: String(nextTrainNumber), position: spawn.position)
+        var t = Train(id: UUID(), label: String(nextTrainNumber),
+                      ownerPeerId: localPeerId, position: spawn.position)
         nextTrainNumber += 1
         t.status = .docked
         t.isDwelling = true
@@ -153,13 +176,16 @@ final class MetroWorld: ObservableObject {
         t.movementAuthority = spawn.position
         t.passengerCount = Int.random(in: 10...40)
         trains.append(t)
-        trains.sort { $0.label < $1.label }
+        sortTrains()
+        onLocalChange?(t)
         return t
     }
 
     func removeTrain(id: UUID) {
+        guard let train = trains.first(where: { $0.id == id }), canControl(train) else { return }
         trains.removeAll { $0.id == id }
         doorOpenSince.removeValue(forKey: id)
+        onLocalRemove?(id)
     }
 
     private func nearestTrainDistance(to position: Double) -> Double {
@@ -170,12 +196,88 @@ final class MetroWorld: ObservableObject {
         }.min() ?? .greatestFiniteMagnitude
     }
 
-    /// Single mutation choke point, mirroring a PLC output-image write.
+    private func sortTrains() {
+        trains.sort { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
+    }
+
+    // MARK: -- peer plumbing
+
+    func locallyOwned() -> [Train] {
+        trains.filter { $0.ownerPeerId == localPeerId }
+    }
+
+    func canControl(_ train: Train) -> Bool {
+        train.ownerPeerId == localPeerId
+    }
+
+    /// Adopt or refresh a peer-owned rame from a `.state` snapshot.
+    func upsert(_ train: Train) {
+        if let idx = trains.firstIndex(where: { $0.id == train.id }) {
+            trains[idx] = train
+        } else {
+            trains.append(train)
+            sortTrains()
+        }
+    }
+
+    func removeAll(ownedBy peerId: String) {
+        trains.removeAll { $0.ownerPeerId == peerId }
+    }
+
+    func remove(id: UUID, ownedBy peerId: String) {
+        trains.removeAll { $0.id == id && $0.ownerPeerId == peerId }
+    }
+
+    /// Single mutation choke point for LOCALLY-OWNED rames, mirroring a PLC
+    /// output-image write. A mutation request against a peer-owned rame is
+    /// silently ignored (returns nil) -- this node never rewrites state it
+    /// doesn't own, no matter who asked. Fires `onLocalChange` so the fresh
+    /// state reaches peers immediately.
     @discardableResult
     func mutate(_ id: UUID, _ block: (inout Train) -> Void) -> Train? {
         guard let idx = trains.firstIndex(where: { $0.id == id }) else { return nil }
+        guard trains[idx].ownerPeerId == localPeerId else { return nil }
         block(&trains[idx])
-        return trains[idx]
+        let snap = trains[idx]
+        onLocalChange?(snap)
+        return snap
+    }
+
+    /// Apply a train-control action to a LOCALLY-OWNED rame. This is the
+    /// single choke point the local operator path, the DCL verbs, the
+    /// Modbus coil/register writes, and the inbound peer `.command`
+    /// handler all funnel through.
+    @discardableResult
+    func applyControl(trainId: UUID, kind: TrainCommandKind, value: Double? = nil) -> Train? {
+        mutate(trainId) { t in
+            switch kind {
+            case .openDoors:
+                guard t.speed < 0.1 else { return }
+                t.doorsOpen = true
+                t.isDwelling = true
+                t.dwellRemaining = max(t.dwellRemaining, 5.0)
+                t.status = .docked
+            case .closeDoors:
+                t.doorsOpen = false
+                t.isDwelling = false
+                t.dwellRemaining = 0
+                t.paxRemaining = 0
+            case .fuSet:
+                t.isEmergencyBrakeApplied = true
+            case .fuRelease:
+                t.isEmergencyBrakeApplied = false
+                if t.status == .emergency { t.status = .stopped }
+            case .modeAuto:
+                t.mode = .auto
+                t.manualSpeedRequest = 0
+            case .modeManual:
+                t.mode = .manual
+                t.manualSpeedRequest = 0
+            case .setSpeed:
+                guard t.mode == .manual else { return }
+                t.manualSpeedRequest = max(0, min(Sim.manualSpeedMax, value ?? 0))
+            }
+        }
     }
 
     /// Find a rame by operator-supplied label: "101", "R101", "RAME 101".
@@ -218,9 +320,9 @@ final class MetroWorld: ObservableObject {
     func emergencyStopAll(_ on: Bool) {
         isEmergencyStopped = on
         if on {
-            for t in trains { mutate(t.id) { $0.isEmergencyBrakeApplied = true } }
+            for t in locallyOwned() { mutate(t.id) { $0.isEmergencyBrakeApplied = true } }
         } else {
-            for t in trains {
+            for t in locallyOwned() {
                 mutate(t.id) { tr in
                     tr.isEmergencyBrakeApplied = false
                     if tr.status == .emergency { tr.status = .stopped }
@@ -229,19 +331,20 @@ final class MetroWorld: ObservableObject {
         }
     }
 
-    /// Engage / clear a service provisoire. Setting one teleports any rame
-    /// stranded outside the active section to the nearest served station
-    /// (mirroring how the exploitation would clear the barred section);
-    /// clearing it returns every rame to forward running.
+    /// Engage / clear a service provisoire. A local exploitation overlay:
+    /// only this node's rames observe the barriers and shuttle pattern.
+    /// Setting one teleports any locally-owned rame stranded outside the
+    /// active section to the nearest served station; clearing it returns
+    /// every local rame to forward running.
     func setServiceProvisoire(_ sp: ServiceProvisoire?) {
         if sp == nil, activeSP != nil {
-            for t in trains {
+            for t in locallyOwned() {
                 mutate(t.id) { $0.travelDirection = .forward }
             }
             lastTerminusDeparture.removeAll()
         } else if let sp {
             let served = activeStations(sp: sp)
-            for t in trains where isStranded(t, sp: sp) {
+            for t in locallyOwned() where isStranded(t, sp: sp) {
                 guard let nearest = served.min(by: { loopDistance(from: t.position, to: $0.position) < loopDistance(from: t.position, to: $1.position) }) else { continue }
                 mutate(t.id) { tr in
                     tr.position = nearest.position
@@ -299,22 +402,38 @@ final class MetroWorld: ObservableObject {
         enforceServiceProvisoire(now: now)
 
         for index in trains.indices {
-            advance(&trains[index], dt: dt)
+            if trains[index].ownerPeerId == localPeerId {
+                advance(&trains[index], dt: dt)
+            } else {
+                deadReckon(&trains[index], dt: dt)
+            }
         }
 
         sampleSystemAlarms()
         sampleTrainAlarms(at: now)
     }
 
-    /// Zone-controller pass: each train's LMA is the tail of the train
-    /// ahead minus the safety margin, or an SP virtual barrier when one is
-    /// closer. Direction-aware so reversed shuttles brake toward the
-    /// correct barrier.
+    /// Dead-reckon a peer-owned rame between `.state` snapshots: integrate
+    /// the last reported speed along its running direction. At the daemon's
+    /// default 60 Hz broadcast the snapshots dominate; at lower rates this
+    /// keeps motion smooth instead of stepping.
+    private func deadReckon(_ train: inout Train, dt: Double) {
+        guard train.speed > 0.01 else { return }
+        train.position += train.speed * train.travelDirection.rawValue * dt
+        train.position = train.position.truncatingRemainder(dividingBy: Sim.trackLength)
+        if train.position < 0 { train.position += Sim.trackLength }
+    }
+
+    /// Zone-controller pass: each locally-owned train's LMA is the tail of
+    /// the train ahead (local OR remote) minus the safety margin, or an SP
+    /// virtual barrier when one is closer. Direction-aware so reversed
+    /// shuttles brake toward the correct barrier. Peer-owned trains are
+    /// obstacles only -- their own node computes their authority.
     private func computeMovementAuthorities() {
         let trackLength = Sim.trackLength
         let snapshot = trains
 
-        for me in snapshot {
+        for me in snapshot where me.ownerPeerId == localPeerId {
             var minDist = Double.greatestFiniteMagnitude
             var obstaclePos: Double? = nil
             var isSPBarrier = false
@@ -372,24 +491,27 @@ final class MetroWorld: ObservableObject {
                 }
             }
 
-            mutate(me.id) { t in
-                t.movementAuthority = ma
-                t.targetSpeed = Sim.lineSpeed
+            // Direct write (not mutate): the MA refresh happens every scan
+            // for every local train; broadcasting it as an operator event
+            // would flood the wire. The periodic state rebroadcast carries it.
+            if let idx = trains.firstIndex(where: { $0.id == me.id }) {
+                trains[idx].movementAuthority = ma
+                trains[idx].targetSpeed = Sim.lineSpeed
             }
         }
     }
 
     /// SP shuttle behaviour: reverse a rame docked at a terminus pointing
     /// at the barrier, and pace departures from the termini to the
-    /// configured headway.
+    /// configured headway. Locally-owned rames only.
     private func enforceServiceProvisoire(now: Date) {
         guard let sp = activeSP else {
-            for t in trains where t.isDepartureHold {
+            for t in locallyOwned() where t.isDepartureHold {
                 mutate(t.id) { $0.isDepartureHold = false }
             }
             return
         }
-        for t in trains {
+        for t in locallyOwned() {
             if t.status == .docked, t.speed == 0, t.paxRemaining == 0, !isStranded(t, sp: sp) {
                 if (t.lastServicedStationId == sp.startStationId && t.travelDirection == .reverse) ||
                    (t.lastServicedStationId == sp.endStationId && t.travelDirection == .forward) {
@@ -428,7 +550,7 @@ final class MetroWorld: ObservableObject {
         // alarm, line-wide emergency -- maximum-rate brake to a stand.
         if train.isDoorFault || train.isBrakeFault || train.isEmergencyBrakeApplied ||
            isEmergencyStopped || motionInhibitedByAlarm(for: train) {
-            train.status = train.speed > 0.05 ? .emergency : .emergency
+            train.status = .emergency
             train.distanceToMA = effectiveDistToMA
             applyPhysics(&train, acceleration: -Sim.emergencyBraking, trackLength: trackLength)
             updateAuxiliaries(&train, dt: dt)
@@ -654,6 +776,29 @@ final class MetroWorld: ObservableObject {
         train.compressorPressure = max(6.0, min(9.5, train.compressorPressure))
     }
 
+    // MARK: -- safety chain (shared by Modbus DI and the alarm samplers)
+
+    /// Assembles a rame's safety-chain contact states for the Modbus
+    /// discrete-input block (each `true` = contact closed / healthy). The
+    /// overall loop is additionally gated on the line not being under a
+    /// general emergency stop, so an arrêt d'urgence reads as a chain
+    /// interrupt.
+    func safetyChain(for train: Train) -> SafetyChain {
+        let doorInterlock = train.doorInterlockLocked || train.status == .docked
+        let overspeedOK   = !train.isOverspeed
+        let maOK          = !train.isMAEncroached
+        let brakeOK       = !train.isBrakeFault
+        let adhesionOK    = train.worstTire != .burst
+        let intact = doorInterlock && overspeedOK && maOK && brakeOK && adhesionOK
+            && !isEmergencyStopped
+        return SafetyChain(doorInterlock: doorInterlock,
+                           overspeedOK: overspeedOK,
+                           maMarginOK: maOK,
+                           brakeOK: brakeOK,
+                           adhesionOK: adhesionOK,
+                           intact: intact)
+    }
+
     // MARK: -- alarm sampling
 
     private func sampleSystemAlarms() {
@@ -672,10 +817,14 @@ final class MetroWorld: ObservableObject {
     }
 
     private func sampleTrainAlarms(at now: Date) {
-        let currentIds = Set(trains.map(\.id))
+        // A node's SCADA only monitors the rames it OWNS. Remote rames are
+        // the owning node's responsibility -- sampling their broadcast
+        // state here would raise faults this node can't remediate.
+        let localTrains = locallyOwned()
+        let currentIds = Set(localTrains.map(\.id))
         doorOpenSince = doorOpenSince.filter { currentIds.contains($0.key) }
 
-        for train in trains {
+        for train in localTrains {
             let source = "RAME \(train.label)"
 
             sample(source, "OVERSPEED", train.isOverspeed, .critical, "alarm.msg.overspeed")
@@ -736,8 +885,8 @@ final class MetroWorld: ObservableObject {
         }
     }
 
-    /// A latched SYS/CONTROLLER fault (PCC watchdog) freezes every rame,
-    /// like a controller-fault interlock in a real DCS.
+    /// A latched SYS/CONTROLLER fault (PCC watchdog) freezes every local
+    /// rame, like a controller-fault interlock in a real DCS.
     private func motionInhibitedByAlarm(for train: Train) -> Bool {
         alarmLog.contains { $0.isActive && $0.source == "SYS" && $0.point == "CONTROLLER" }
     }

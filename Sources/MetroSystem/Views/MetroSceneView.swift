@@ -18,6 +18,7 @@ struct MetroSceneWindow: View {
         ZStack(alignment: .topLeading) {
             MetroSceneRepresentable(
                 world: world,
+                cantonShort: language.t("block.short"),
                 recenterTrigger: recenterTrigger,
                 isolatedTrainId: isolatedTrainId
             )
@@ -37,6 +38,7 @@ struct MetroSceneWindow: View {
         }
         .frame(minWidth: 720, minHeight: 560)
         .background(Color.black)
+        .navigationTitle(language.t("window.scene"))
         .onChange(of: world.trains.count) {
             if let id = isolatedTrainId,
                !world.trains.contains(where: { $0.id == id }) {
@@ -126,7 +128,7 @@ private struct HudOverlay: View {
 
             if let id = isolatedTrainId,
                let train = world.trains.first(where: { $0.id == id }) {
-                Text("\(language.t("scene.isolated.prefix")) \(train.displayName)")
+                Text("\(language.t("scene.isolated.prefix")) \(language.t("train.rame")) \(train.label)")
                     .font(RetroTheme.monoSm)
                     .foregroundColor(RetroTheme.cyan)
                     .padding(.top, 2)
@@ -167,11 +169,12 @@ private struct HudOverlay: View {
 
 struct MetroSceneRepresentable: NSViewRepresentable {
     let world: MetroWorld
+    let cantonShort: String
     let recenterTrigger: Int
     let isolatedTrainId: UUID?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(world: world)
+        Coordinator(world: world, cantonShort: cantonShort)
     }
 
     func makeNSView(context: Context) -> SCNView {
@@ -200,6 +203,7 @@ struct MetroSceneRepresentable: NSViewRepresentable {
     final class Coordinator {
         let scene = SCNScene()
         let world: MetroWorld
+        let cantonShort: String
         var lastRecenterTrigger: Int = 0
         var isolatedTrainId: UUID? = nil
         private weak var sceneView: SCNView?
@@ -225,8 +229,9 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             let label: SCNNode
         }
 
-        init(world: MetroWorld) {
+        init(world: MetroWorld, cantonShort: String) {
             self.world = world
+            self.cantonShort = cantonShort
             buildStaticScene()
             world.$trains
                 .receive(on: RunLoop.main)
@@ -346,7 +351,7 @@ struct MetroSceneRepresentable: NSViewRepresentable {
                 scene.rootNode.addChildNode(marker)
 
                 let numLabel = makeBillboardLabel(
-                    text: "C\(canton.id)", height: 6,
+                    text: String(format: cantonShort, canton.id), height: 6,
                     color: NSColor(deviceRed: 0.62, green: 0.45, blue: 0.12, alpha: 1))
                 numLabel.position = point(at: canton.startPosition + canton.length / 2,
                                           y: 3, radialScale: 0.92)

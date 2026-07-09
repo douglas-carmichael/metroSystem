@@ -143,8 +143,8 @@ final class DCLScriptStore {
         $ RESUME    == "VALCP SET LIGNE /NORMAL"
         $ REPRISE   == "VALCP SET LIGNE /NORMAL"
         $ AIDE      == "HELP"
-        $ WRITE SYS$OUTPUT "LPD VAL-CP aliases loaded (EN):  TRAIN FLEET LINE STATIONS PAX EMERGENCY RESUME"
-        $ WRITE SYS$OUTPUT "Alias LPD VAL-CP charges (FR):   RAME FLOTTE LIGNE GARES PAX URGENCE REPRISE AIDE"
+        $ WRITE SYS$OUTPUT "LPD VAL-CP aliases loaded (EN):   TRAIN FLEET LINE STATIONS PAX EMERGENCY RESUME"
+        $ WRITE SYS$OUTPUT "Alias LPD VAL-CP chargés (FR) :   RAME FLOTTE LIGNE GARES PAX URGENCE REPRISE AIDE"
         $ EXIT
         """)
         seed(name: "HELLO.COM", body: """

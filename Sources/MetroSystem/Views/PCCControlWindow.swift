@@ -3,15 +3,22 @@ import AppKit
 
 /// The PCC (poste de commande centralisé) dispatcher panel: line-wide
 /// controls, the SCADA alarm annunciator, and one control panel per rame.
+/// Remote rames (owned by another node or a ClusterDaemon peer) render
+/// with a REMOTE tag: exploitation controls (doors, FU, mode, manual
+/// speed) forward over the peer link; physical-condition controls (fault
+/// injection, tires, withdraw) stay owner-only and are hidden.
 struct PCCControlWindow: View {
     @EnvironmentObject var world: MetroWorld
     @EnvironmentObject var language: AppLanguage
+    @EnvironmentObject var network: PeerNetwork
     @EnvironmentObject var telnet: DCLTelnetServer
+    @EnvironmentObject var modbus: ModbusTCPServer
     @Environment(\.openWindow) private var openWindow
 
     @State private var focusedTrainId: UUID?
     @State private var showHelp: Bool = false
     @State private var showCredits: Bool = false
+    @State private var showModbusLegend: Bool = false
 
     var body: some View {
         ZStack {
@@ -44,9 +51,14 @@ struct PCCControlWindow: View {
                 CreditsOverlay(onDismiss: { showCredits = false })
                     .transition(.opacity)
             }
+            if showModbusLegend {
+                ModbusLegendOverlay(onDismiss: { showModbusLegend = false })
+                    .transition(.opacity)
+            }
         }
         .frame(minWidth: 980, minHeight: 680)
         .environment(\.colorScheme, .dark)
+        .navigationTitle(language.t("window.control"))
         .onAppear { ensureFocus() }
         .onChange(of: world.trains.map(\.id)) { ensureFocus() }
     }
@@ -59,6 +71,7 @@ struct PCCControlWindow: View {
         if ev.keyCode == KeyCode.escape {
             if showHelp { showHelp = false; return nil }
             if showCredits { showCredits = false; return nil }
+            if showModbusLegend { showModbusLegend = false; return nil }
             return ev
         }
         if ev.keyCode == KeyCode.f1 {
@@ -90,14 +103,17 @@ struct PCCControlWindow: View {
         case "y":
             openWindow(id: "dynamics")
             return nil
+        case "m":
+            showModbusLegend.toggle()
+            return nil
         case "a":
             toggleFocusedMode()
             return nil
         case "o":
-            focusedDoors(open: true)
+            controlFocused(.openDoors)
             return nil
         case "c":
-            focusedDoors(open: false)
+            controlFocused(.closeDoors)
             return nil
         case "f":
             toggleFocusedFU()
@@ -111,14 +127,21 @@ struct PCCControlWindow: View {
         return ev
     }
 
+    /// Rames the keyboard focus ring walks: anything we can drive --
+    /// locally owned, or remote with a live link to its owner. Same order
+    /// the panels render in, so TAB advances visually.
+    private func controllableTrains() -> [Train] {
+        world.sortedTrains.filter { network.canControl($0) }
+    }
+
     private func ensureFocus() {
-        let trains = world.sortedTrains
+        let trains = controllableTrains()
         if let id = focusedTrainId, trains.contains(where: { $0.id == id }) { return }
         focusedTrainId = trains.first?.id
     }
 
     private func cycleFocus() {
-        let trains = world.sortedTrains
+        let trains = controllableTrains()
         guard !trains.isEmpty else { focusedTrainId = nil; return }
         if let id = focusedTrainId, let idx = trains.firstIndex(where: { $0.id == id }) {
             focusedTrainId = trains[(idx + 1) % trains.count].id
@@ -127,43 +150,22 @@ struct PCCControlWindow: View {
         }
     }
 
-    private func focusedDoors(open: Bool) {
+    private func controlFocused(_ kind: TrainCommandKind, value: Double? = nil) {
         guard let id = focusedTrainId,
               let train = world.trains.first(where: { $0.id == id }) else { return }
-        if open {
-            guard train.speed < 0.1 else { return }
-            world.mutate(id) { t in
-                t.doorsOpen = true
-                t.isDwelling = true
-                t.dwellRemaining = max(t.dwellRemaining, 5.0)
-                t.status = .docked
-            }
-        } else {
-            world.mutate(id) { t in
-                t.doorsOpen = false
-                t.isDwelling = false
-                t.dwellRemaining = 0
-                t.paxRemaining = 0
-            }
-        }
+        _ = network.control(train, kind, value: value)
     }
 
     private func toggleFocusedMode() {
         guard let id = focusedTrainId,
               let train = world.trains.first(where: { $0.id == id }) else { return }
-        world.mutate(id) { t in
-            t.mode = train.mode == .auto ? .manual : .auto
-            t.manualSpeedRequest = 0
-        }
+        _ = network.control(train, train.mode == .auto ? .modeManual : .modeAuto)
     }
 
     private func toggleFocusedFU() {
         guard let id = focusedTrainId,
               let train = world.trains.first(where: { $0.id == id }) else { return }
-        world.mutate(id) { t in
-            t.isEmergencyBrakeApplied = !train.isEmergencyBrakeApplied
-            if train.isEmergencyBrakeApplied && t.status == .emergency { t.status = .stopped }
-        }
+        _ = network.control(train, train.isEmergencyBrakeApplied ? .fuRelease : .fuSet)
     }
 }
 
@@ -191,7 +193,9 @@ private struct BannerHeader: View {
 private struct StatusStrip: View {
     @EnvironmentObject var world: MetroWorld
     @EnvironmentObject var language: AppLanguage
+    @EnvironmentObject var network: PeerNetwork
     @EnvironmentObject var telnet: DCLTelnetServer
+    @EnvironmentObject var modbus: ModbusTCPServer
 
     var body: some View {
         // A wrapping FlowLayout keeps the strip on one line when there's room
@@ -199,14 +203,20 @@ private struct StatusStrip: View {
         // field stays visible even at the minimum window size.
         FlowLayout(horizontalSpacing: 18, verticalSpacing: 4) {
             StatusLine(label: language.t("status.node"),
-                       value: Host.current().localizedName ?? "PCC",
+                       value: world.localPeerLabel,
                        valueColor: RetroTheme.cyan)
+            StatusLine(label: language.t("status.peers"),
+                       value: peersValue,
+                       valueColor: network.peers.isEmpty ? RetroTheme.amberDim : RetroTheme.green)
             StatusLine(label: language.t("status.rames"),
-                       value: "\(world.trains.count)/\(Sim.maxTrainCount)",
+                       value: "\(world.trains.count)",
                        valueColor: RetroTheme.amberBright)
             StatusLine(label: language.t("status.telnet"),
                        value: telnetValue,
                        valueColor: telnet.sessionCount == 0 ? RetroTheme.amberDim : RetroTheme.green)
+            StatusLine(label: language.t("status.modbus"),
+                       value: modbusValue,
+                       valueColor: modbus.displayedClientCount == 0 ? RetroTheme.amberDim : RetroTheme.green)
             StatusLine(label: language.t("status.mode"),
                        value: modeValue,
                        valueColor: modeColor)
@@ -222,12 +232,30 @@ private struct StatusStrip: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var peersValue: String {
+        let count = network.peers.count
+        switch count {
+        case 0:  return language.t("status.peers.none")
+        case 1:  return "1 \(language.t("status.peers.node"))"
+        default: return "\(count) \(language.t("status.peers.nodes"))"
+        }
+    }
+
     private var telnetValue: String {
         let count = telnet.sessionCount
         switch count {
         case 0:  return language.t("status.telnet.none")
         case 1:  return language.t("status.telnet.one")
         default: return String(format: language.t("status.telnet.many"), count)
+        }
+    }
+
+    private var modbusValue: String {
+        let count = modbus.displayedClientCount
+        switch count {
+        case 0:  return language.t("status.modbus.none")
+        case 1:  return language.t("status.modbus.one")
+        default: return String(format: language.t("status.modbus.many"), count)
         }
     }
 
@@ -298,7 +326,7 @@ private struct LineControlPanel: View {
                     }
                     Spacer()
                     RetroButton(language.t("line.addtrain"),
-                                enabled: world.trains.count < Sim.maxTrainCount) {
+                                enabled: world.locallyOwned().count < Sim.maxTrainCount) {
                         _ = world.addTrain()
                     }
                 }
@@ -473,7 +501,9 @@ private struct SCADAAlarmPanel: View {
         guard let pick = Self.weightedPool.randomElement() else { return }
         let resolvedSource: String
         if pick.source == "RAME" {
-            if let train = world.trains.randomElement() {
+            // Bind rame faults to a locally-owned rame -- remote rames are
+            // the owning node's SCADA responsibility.
+            if let train = world.locallyOwned().randomElement() {
                 resolvedSource = "RAME \(train.label)"
             } else {
                 resolvedSource = "RAME FLEET"
@@ -621,14 +651,17 @@ private struct TrainPanel: View {
     let train: Train
     let focused: Bool
     @EnvironmentObject var world: MetroWorld
+    @EnvironmentObject var network: PeerNetwork
     @EnvironmentObject var language: AppLanguage
+
+    private var isLocal: Bool { world.canControl(train) }
 
     var body: some View {
         BoxPanel(title: titleLine, accent: titleAccent) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 24) {
                     StatusLine(label: language.t("train.canton"),
-                               value: world.canton(at: train.position)?.name ?? "--",
+                               value: world.canton(at: train.position).map { language.t("block.name", $0.id) } ?? "--",
                                valueColor: RetroTheme.amberBright)
                     StatusLine(label: language.t("train.speed"),
                                value: String(format: "%5.1f m/s", train.speed),
@@ -669,32 +702,44 @@ private struct TrainPanel: View {
                     ModeControls(train: train)
                     Spacer()
                     RetroButton(language.t("btn.fu"),
+                                enabled: network.canControl(train),
                                 highlighted: train.isEmergencyBrakeApplied) {
-                        world.mutate(train.id) { t in
-                            t.isEmergencyBrakeApplied.toggle()
-                            if !t.isEmergencyBrakeApplied && t.status == .emergency { t.status = .stopped }
+                        _ = network.control(train, train.isEmergencyBrakeApplied ? .fuRelease : .fuSet)
+                    }
+                    if isLocal {
+                        RetroButton(language.t("btn.remove")) {
+                            world.removeTrain(id: train.id)
                         }
                     }
-                    RetroButton(language.t("btn.remove")) {
-                        world.removeTrain(id: train.id)
-                    }
                 }
-                if train.mode == .manual {
+                if train.mode == .manual && network.canControl(train) {
                     ManualSpeedControls(train: train)
                 }
-                FaultControls(train: train)
-                TireStrip(train: train)
+                // Physical-condition controls model the owning node's
+                // rolling stock; they stay owner-only (the wire carries no
+                // fault-injection commands, by design).
+                if isLocal {
+                    FaultControls(train: train)
+                    TireStrip(train: train)
+                }
             }
         }
+        // Dim only a rame we genuinely can't drive (remote with no live
+        // link to its owner).
+        .opacity(network.canControl(train) ? 1.0 : 0.78)
     }
 
     private var titleLine: String {
         let mode = train.mode == .auto ? language.t("train.mode.cai") : language.t("train.mode.cml")
-        return "\(language.t("train.rame")) \(train.label) [\(mode)]"
+        let owner = isLocal ? language.t("train.tag.local") : language.t("train.tag.remote")
+        return "\(language.t("train.rame")) \(train.label) [\(mode)] [\(owner)]"
     }
 
     private var titleAccent: Color {
         if train.isEmergencyBrakeApplied || train.status == .emergency { return .red }
+        if !isLocal {
+            return network.canControl(train) ? RetroTheme.green : RetroTheme.greenDim
+        }
         return train.mode == .manual ? RetroTheme.cyan : RetroTheme.amber
     }
 
@@ -729,40 +774,30 @@ private struct TrainPanel: View {
 
     private var faultString: String {
         var faults: [String] = []
-        if train.isDoorFault   { faults.append("PORTES") }
-        if train.isEngineFault { faults.append("TRACTION") }
-        if train.isBrakeFault  { faults.append("FREIN") }
-        if train.isSignalFault { faults.append("CTC") }
-        if train.isPatinage    { faults.append("PATIN") }
-        if train.isEnrayage    { faults.append("ENRAY") }
+        if train.isDoorFault   { faults.append(language.t("fault.portes")) }
+        if train.isEngineFault { faults.append(language.t("fault.traction")) }
+        if train.isBrakeFault  { faults.append(language.t("fault.frein")) }
+        if train.isSignalFault { faults.append(language.t("fault.ctc")) }
+        if train.isPatinage    { faults.append(language.t("fault.patinage")) }
+        if train.isEnrayage    { faults.append(language.t("fault.enrayage")) }
         return faults.joined(separator: " ")
     }
 }
 
 private struct DoorControls: View {
     let train: Train
-    @EnvironmentObject var world: MetroWorld
+    @EnvironmentObject var network: PeerNetwork
     @EnvironmentObject var language: AppLanguage
 
     var body: some View {
         HStack(spacing: 10) {
             RetroButton(language.t("btn.door.open"),
-                        enabled: train.speed < 0.1 && !train.doorsOpen) {
-                world.mutate(train.id) { t in
-                    t.doorsOpen = true
-                    t.isDwelling = true
-                    t.dwellRemaining = max(t.dwellRemaining, 5.0)
-                    t.status = .docked
-                }
+                        enabled: network.canControl(train) && train.speed < 0.1 && !train.doorsOpen) {
+                _ = network.control(train, .openDoors)
             }
             RetroButton(language.t("btn.door.close"),
-                        enabled: train.doorsOpen) {
-                world.mutate(train.id) { t in
-                    t.doorsOpen = false
-                    t.isDwelling = false
-                    t.dwellRemaining = 0
-                    t.paxRemaining = 0
-                }
+                        enabled: network.canControl(train) && train.doorsOpen) {
+                _ = network.control(train, .closeDoors)
             }
         }
     }
@@ -770,7 +805,7 @@ private struct DoorControls: View {
 
 private struct ModeControls: View {
     let train: Train
-    @EnvironmentObject var world: MetroWorld
+    @EnvironmentObject var network: PeerNetwork
     @EnvironmentObject var language: AppLanguage
 
     var body: some View {
@@ -779,29 +814,26 @@ private struct ModeControls: View {
                 .font(RetroTheme.monoSm)
                 .foregroundColor(RetroTheme.amberDim)
             RetroButton(language.t("btn.mode.auto"),
+                        enabled: network.canControl(train),
                         highlighted: train.mode == .auto) {
                 guard train.mode != .auto else { return }
-                world.mutate(train.id) { t in
-                    t.mode = .auto
-                    t.manualSpeedRequest = 0
-                }
+                _ = network.control(train, .modeAuto)
             }
             RetroButton(language.t("btn.mode.manual"),
+                        enabled: network.canControl(train),
                         highlighted: train.mode == .manual) {
                 guard train.mode != .manual else { return }
-                world.mutate(train.id) { t in
-                    t.mode = .manual
-                    t.manualSpeedRequest = 0
-                }
+                _ = network.control(train, .modeManual)
             }
         }
     }
 }
 
-/// Manual-mode driver desk: speed setpoint chips 0..20 m/s.
+/// Manual-mode driver desk: speed setpoint chips 0..20 m/s. Routed through
+/// the peer link so a remote rame's setpoint lands on its owning node.
 private struct ManualSpeedControls: View {
     let train: Train
-    @EnvironmentObject var world: MetroWorld
+    @EnvironmentObject var network: PeerNetwork
     @EnvironmentObject var language: AppLanguage
 
     var body: some View {
@@ -812,7 +844,7 @@ private struct ManualSpeedControls: View {
             ForEach([0.0, 3.0, 5.0, 8.0, 12.0, 16.0, 20.0], id: \.self) { value in
                 RetroButton(String(format: "%.0f", value),
                             highlighted: abs(train.manualSpeedRequest - value) < 0.1) {
-                    world.mutate(train.id) { $0.manualSpeedRequest = value }
+                    _ = network.control(train, .setSpeed, value: value)
                 }
             }
             Text("m/s")
@@ -825,7 +857,7 @@ private struct ManualSpeedControls: View {
 
 /// Latched fault injection per rame -- each chip toggles one Train flag,
 /// the physics reacts on the next scan, and the SCADA sampler raises the
-/// matching alarm point.
+/// matching alarm point. Owner-only (shown for local rames).
 private struct FaultControls: View {
     let train: Train
     @EnvironmentObject var world: MetroWorld
@@ -836,12 +868,12 @@ private struct FaultControls: View {
             Text("\(language.t("train.faults.label")):")
                 .font(RetroTheme.monoSm)
                 .foregroundColor(RetroTheme.amberDim)
-            faultChip("PORTES", isOn: train.isDoorFault)   { $0.isDoorFault.toggle() }
-            faultChip("TRACTION", isOn: train.isEngineFault) { $0.isEngineFault.toggle() }
-            faultChip("FREIN", isOn: train.isBrakeFault)   { $0.isBrakeFault.toggle() }
-            faultChip("CTC", isOn: train.isSignalFault)    { $0.isSignalFault.toggle() }
-            faultChip("PATINAGE", isOn: train.isPatinage)  { $0.isPatinage.toggle() }
-            faultChip("ENRAYAGE", isOn: train.isEnrayage)  { $0.isEnrayage.toggle() }
+            faultChip(language.t("fault.portes"), isOn: train.isDoorFault)     { $0.isDoorFault.toggle() }
+            faultChip(language.t("fault.traction"), isOn: train.isEngineFault) { $0.isEngineFault.toggle() }
+            faultChip(language.t("fault.frein"), isOn: train.isBrakeFault)     { $0.isBrakeFault.toggle() }
+            faultChip(language.t("fault.ctc"), isOn: train.isSignalFault)      { $0.isSignalFault.toggle() }
+            faultChip(language.t("fault.patinage"), isOn: train.isPatinage)    { $0.isPatinage.toggle() }
+            faultChip(language.t("fault.enrayage"), isOn: train.isEnrayage)    { $0.isEnrayage.toggle() }
             Spacer()
         }
     }
@@ -854,7 +886,7 @@ private struct FaultControls: View {
 }
 
 /// The eight VAL tires; each chip cycles OK -> low pressure -> puncture ->
-/// burst -> OK, and colors by severity.
+/// burst -> OK, and colors by severity. Owner-only.
 private struct TireStrip: View {
     let train: Train
     @EnvironmentObject var world: MetroWorld
@@ -877,12 +909,21 @@ private struct TireStrip: View {
                         .overlay(Rectangle().stroke(tireColor(tire.status), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
-                .help("\(String(format: "%.1f", tire.pressure)) bar — \(tire.status.rawValue)")
+                .help("\(String(format: "%.1f", tire.pressure)) bar — \(tireName(tire.status))")
             }
             Text(language.t("train.tires.hint"))
                 .font(RetroTheme.monoSm)
                 .foregroundColor(RetroTheme.amberDim)
             Spacer()
+        }
+    }
+
+    private func tireName(_ status: Train.Tire.TireStatus) -> String {
+        switch status {
+        case .ok:          return language.t("train.tire.ok")
+        case .lowPressure: return language.t("train.tire.low")
+        case .puncture:    return language.t("train.tire.puncture")
+        case .burst:       return language.t("train.tire.burst")
         }
     }
 
@@ -954,6 +995,7 @@ private struct HelpOverlay: View {
                     row("A",         language.t("help.k.mode"))
                     row("F",         language.t("help.k.fu"))
                     row("E",         language.t("help.k.emergency"))
+                    row("M",         language.t("help.k.modbus"))
                     row("D",         language.t("help.k.dcl"))
                     row("S",         language.t("help.k.scene"))
                     row("Y",         language.t("help.k.dynamics"))
@@ -1009,7 +1051,7 @@ private struct CreditsOverlay: View {
                             role: language.t("credits.role.metro"),
                             name: "Douglas Carmichael",
                             email: "dcarmich@dcarmichael.net",
-                            url: "CBTC simulation after the DC CBTC metro simulator"
+                            url: language.t("credits.metro.detail")
                         )
                         creditBlock(
                             role: language.t("credits.role.retro"),
@@ -1047,6 +1089,144 @@ private struct CreditsOverlay: View {
             Text(url)
                 .font(RetroTheme.monoSm)
                 .foregroundColor(RetroTheme.amberDim)
+        }
+    }
+}
+
+/// Reference card for the Modbus TCP register map. Toggled with M --
+/// designed so a viewer following along with `mbpoll` or QModMaster
+/// can read what each register / coil offset means without diving
+/// into the source. ESC, M again, or tap-anywhere dismisses.
+private struct ModbusLegendOverlay: View {
+    let onDismiss: () -> Void
+    @EnvironmentObject var language: AppLanguage
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                RetroTheme.bg.opacity(0.9).ignoresSafeArea()
+                BoxPanel(title: language.t("modbus.legend.title"), accent: RetroTheme.cyan) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(language.t("modbus.legend.endpoint"))
+                            .font(RetroTheme.monoSm)
+                            .foregroundColor(RetroTheme.amberDim)
+                        Spacer().frame(height: 4)
+
+                        // Two columns: telemetry/setpoints on the left,
+                        // command + status/safety-chain bits on the right.
+                        // Scrolls if the window is too short to show it all.
+                        ScrollView {
+                            HStack(alignment: .top, spacing: 28) {
+                                inputAndHoldingColumn
+                                coilAndDiscreteColumn
+                            }
+                        }
+
+                        Spacer().frame(height: 8)
+                        Text(language.t("help.dismiss"))
+                            .font(RetroTheme.monoSm)
+                            .foregroundColor(RetroTheme.amberDim)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                    .frame(width: min(828, geo.size.width - 80))
+                }
+                .frame(maxHeight: geo.size.height - 48)
+                .onTapGesture { onDismiss() }
+            }
+        }
+    }
+
+    private func grp(_ g: Int) -> String {
+        let n = ModbusTCPServer.maxTrains
+        return "\(g * n)..\(g * n + n - 1)"
+    }
+
+    /// Left column: input registers (telemetry) + holding registers (setpoints).
+    private var inputAndHoldingColumn: some View {
+        let sb = ModbusTCPServer.scalarBase
+        return VStack(alignment: .leading, spacing: 6) {
+            section(language.t("modbus.legend.ir"))
+            row(grp(0),  language.t("modbus.reg.position"))
+            row(grp(1),  language.t("modbus.reg.speed"))
+            row(grp(2),  language.t("modbus.reg.consigne"))
+            row(grp(3),  language.t("modbus.reg.ma"))
+            row(grp(4),  language.t("modbus.reg.pax"))
+            row(grp(5),  language.t("modbus.reg.status"))
+            row(grp(6),  language.t("modbus.reg.canton"))
+            row(grp(7),  language.t("modbus.reg.tire"))
+            row("\(sb+0)",  language.t("modbus.reg.traincount"))
+            row("\(sb+1)",  language.t("modbus.reg.peers"))
+            row("\(sb+2)",  language.t("modbus.reg.cantoncount"))
+            row("\(sb+3)",  language.t("modbus.reg.telnet"))
+            row("\(sb+4)",  language.t("modbus.reg.clients"))
+            row("\(sb+5)",  language.t("modbus.reg.linemode"))
+            row("\(sb+6)",  language.t("modbus.reg.spfrom"))
+            row("\(sb+7)",  language.t("modbus.reg.spto"))
+            row("\(sb+8)",  language.t("modbus.reg.spheadway"))
+            row("\(sb+9)",  language.t("modbus.reg.alarms"))
+            row("\(sb+10)", language.t("modbus.reg.severity"))
+            row("\(sb+11)", language.t("modbus.reg.unack"))
+            row("\(sb+12)", language.t("modbus.reg.shelved"))
+            row("\(sb+13)", language.t("modbus.reg.rtn"))
+            row("\(sb+14)", language.t("modbus.reg.tracklen"))
+
+            Spacer().frame(height: 4)
+            section(language.t("modbus.legend.hr"))
+            row(grp(0), language.t("modbus.reg.mode"))
+            row(grp(1), language.t("modbus.reg.setspeed"))
+        }
+        .frame(width: 400, alignment: .leading)
+    }
+
+    /// Right column: coils (commands) + discrete inputs (status + safety chain).
+    private var coilAndDiscreteColumn: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            section(language.t("modbus.legend.coil"))
+            row(grp(0), language.t("modbus.reg.dooropen"))
+            row(grp(1), language.t("modbus.reg.doorclose"))
+            row(grp(2), language.t("modbus.reg.fuset"))
+            row(grp(3), language.t("modbus.reg.furelease"))
+
+            Spacer().frame(height: 4)
+            section(language.t("modbus.legend.di"))
+            row(grp(0), language.t("modbus.reg.local"))
+            row(grp(1), language.t("modbus.reg.moving"))
+            row(grp(2), language.t("modbus.reg.doorsopen"))
+            row(grp(3), language.t("modbus.reg.fuapplied"))
+            row(grp(4), language.t("modbus.reg.faultdoor"))
+            row(grp(5), language.t("modbus.reg.faulttraction"))
+            row(grp(6), language.t("modbus.reg.faultbrake"))
+            row(grp(7), language.t("modbus.reg.faultctc"))
+            row(grp(8), language.t("modbus.reg.faultslip"))
+            row(grp(9), language.t("modbus.reg.faultslide"))
+            // Chaîne de sécurité (1 = contact closed / healthy).
+            section(language.t("modbus.legend.chain"))
+            row(grp(10), language.t("modbus.chain.doorinterlock"))
+            row(grp(11), language.t("modbus.chain.overspeed"))
+            row(grp(12), language.t("modbus.chain.ma"))
+            row(grp(13), language.t("modbus.chain.brake"))
+            row(grp(14), language.t("modbus.chain.adhesion"))
+            row(grp(15), language.t("modbus.chain.intact"))
+        }
+        .frame(width: 400, alignment: .leading)
+    }
+
+    private func section(_ text: String) -> some View {
+        Text(text)
+            .font(RetroTheme.mono)
+            .foregroundColor(RetroTheme.cyan)
+            .retroGlow()
+    }
+
+    private func row(_ addr: String, _ desc: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(addr)
+                .font(RetroTheme.mono)
+                .foregroundColor(RetroTheme.amberBright)
+                .frame(width: 88, alignment: .leading)
+            Text(desc)
+                .font(RetroTheme.monoSm)
+                .foregroundColor(RetroTheme.amber)
         }
     }
 }

@@ -206,19 +206,28 @@ extension DCLEngine {
             return String(format: tr("valcp.rame.nosuch"), label)
         }
         let dLabel = train.label
+        let isLocal = world.canControl(train)
+        // Exploitation qualifiers (mode, speed, FU) route to the owning
+        // node for a remote rame, exactly like the PCC panel.
+        func routed(_ kind: TrainCommandKind, value: Double? = nil,
+                    localText: String) -> String {
+            switch routeControl(train, kind, value: value, in: world) {
+            case .local:     return localText
+            case .forwarded: return String(format: tr("valcp.rame.forwarded"), dLabel)
+            case .noLink:    return String(format: tr("valcp.rame.nolink"), dLabel)
+            }
+        }
         if cmd.hasQualifier("MANUAL", min: 3) || cmd.hasQualifier("MANUELLE", min: 3) {
             let was = train.mode
-            world.mutate(train.id) { $0.mode = .manual; $0.manualSpeedRequest = 0 }
-            return was == .manual
+            return routed(.modeManual, localText: was == .manual
                 ? String(format: tr("valcp.rame.man.nochg"), dLabel)
-                : String(format: tr("valcp.rame.man.set"), dLabel)
+                : String(format: tr("valcp.rame.man.set"), dLabel))
         }
         if cmd.hasQualifier("AUTOMATIC", min: 4) || cmd.hasQualifier("AUTO", min: 4) {
             let was = train.mode
-            world.mutate(train.id) { $0.mode = .auto; $0.manualSpeedRequest = 0 }
-            return was == .auto
+            return routed(.modeAuto, localText: was == .auto
                 ? String(format: tr("valcp.rame.auto.nochg"), dLabel)
-                : String(format: tr("valcp.rame.auto.set"), dLabel)
+                : String(format: tr("valcp.rame.auto.set"), dLabel))
         }
         if let speedStr = cmd.qualifierValue("SPEED", min: 3) ?? cmd.qualifierValue("VITESSE", min: 3),
            let requested = Double(speedStr) {
@@ -226,21 +235,21 @@ extension DCLEngine {
                 return String(format: tr("valcp.rame.speed.notmanual"), dLabel)
             }
             let clamped = max(0, min(Sim.manualSpeedMax, requested))
-            world.mutate(train.id) { $0.manualSpeedRequest = clamped }
-            return String(format: tr("valcp.rame.speed.set"), dLabel, clamped)
+            return routed(.setSpeed, value: clamped,
+                          localText: String(format: tr("valcp.rame.speed.set"), dLabel, clamped))
         }
         if let fu = cmd.qualifierValue("FU", min: 2) {
             let on = fu.uppercased() == "ON"
-            world.mutate(train.id) { t in
-                t.isEmergencyBrakeApplied = on
-                if !on && t.status == .emergency { t.status = .stopped }
-            }
-            return on
+            return routed(on ? .fuSet : .fuRelease, localText: on
                 ? String(format: tr("valcp.rame.fu.on"), dLabel)
-                : String(format: tr("valcp.rame.fu.off"), dLabel)
+                : String(format: tr("valcp.rame.fu.off"), dLabel))
         }
-        // Latched fault points. Each maps FR and EN qualifier spellings to
-        // one Train flag.
+        // Latched fault points and tires model the owning node's physical
+        // rolling stock -- owner-only by design (no wire command exists).
+        guard isLocal else {
+            return String(format: tr("valcp.rame.owneronly"), dLabel)
+        }
+        // Each maps FR and EN qualifier spellings to one Train flag.
         let faultMap: [(names: [String], set: (inout Train, Bool) -> Void, key: String)] = [
             (["PORTES", "DOOR"],      { $0.isDoorFault = $1 },   "valcp.rame.fault.portes"),
             (["TRACTION", "ENGINE"],  { $0.isEngineFault = $1 }, "valcp.rame.fault.traction"),
@@ -265,9 +274,20 @@ extension DCLEngine {
                 return String(format: tr("valcp.rame.pneu.range"), Sim.tireCount)
             }
             world.mutate(train.id) { $0.cycleTireStatus(at: n - 1) }
-            let after = world.findTrain(label: dLabel)?.tires[n - 1].status.rawValue ?? "?"
-            return String(format: tr("valcp.rame.pneu.cycled"), dLabel, n, after)
+            let after = world.findTrain(label: dLabel)?.tires[n - 1].status ?? .ok
+            return String(format: tr("valcp.rame.pneu.cycled"), dLabel, n, tireStatusName(after))
         }
         return tr("valcp.rame.missqual")
+    }
+
+    /// Localized display name for a tire state (raw values are wire
+    /// identifiers, not display text).
+    func tireStatusName(_ status: Train.Tire.TireStatus) -> String {
+        switch status {
+        case .ok:          return tr("train.tire.ok")
+        case .lowPressure: return tr("train.tire.low")
+        case .puncture:    return tr("train.tire.puncture")
+        case .burst:       return tr("train.tire.burst")
+        }
     }
 }

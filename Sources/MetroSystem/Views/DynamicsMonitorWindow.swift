@@ -70,13 +70,13 @@ struct DynamicsMonitorWindow: View {
                 velocityTrace
                 Spacer().frame(height: 8)
                 profileFooter
-                stateGloss
                 statusBar
             }
             .padding(20)
         }
         .frame(minWidth: 760, minHeight: 560)
         .environment(\.colorScheme, .dark)
+        .navigationTitle(language.t("window.dynamics"))
         .onAppear { sample() }
         .task {
             while !Task.isCancelled {
@@ -220,7 +220,8 @@ struct DynamicsMonitorWindow: View {
                  color: accelColor(row.accel))
             cell(String(format: "%6.0f m", row.ma), width: 110,
                  color: row.ma < Sim.safetyMargin ? RetroTheme.red : RetroTheme.amber)
-            cell(row.state, width: nil, color: stateColor(row.state))
+            cell(language.t("dynamics.state.\(row.state)"), width: nil,
+                 color: stateColor(row.state))
         }
     }
 
@@ -329,22 +330,8 @@ struct DynamicsMonitorWindow: View {
         }
     }
 
-    // FR-only bridge from the firmware-side English state mnemonics to the
-    // French operational vocabulary. Rendered only when the UI language is
-    // French; in English the column needs no gloss.
-    @ViewBuilder private var stateGloss: some View {
-        if language.current == .fr {
-            Text(language.t("dynamics.state.gloss"))
-                .font(Self.smallFont)
-                .foregroundColor(RetroTheme.amberDim)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
     private var profileFooter: some View {
-        Text(String(format: "%@  V %.1f m/s   accel %.2f m/s²   service %.2f m/s²   FU %.2f m/s²",
-                    language.t("dynamics.profile.limits"),
+        Text(String(format: language.t("dynamics.profile.fmt"),
                     Sim.lineSpeed, Sim.maxAcceleration,
                     Sim.nominalBraking, Sim.emergencyBraking))
             .font(Self.smallFont)
@@ -379,29 +366,30 @@ struct DynamicsMonitorWindow: View {
 
     private func stateColor(_ state: String) -> Color {
         switch state {
-        case "ACCEL":              return RetroTheme.amberBright
-        case "CRUISE":             return RetroTheme.green
-        case "DECEL":              return RetroTheme.amber
-        case "STOPPING", "A QUAI": return RetroTheme.amberDim
-        case "HOLD":               return RetroTheme.cyan
-        case "CML":                return RetroTheme.cyan
-        case "FU":                 return RetroTheme.red
-        case "IDLE":               return RetroTheme.greenDim
-        default:                   return RetroTheme.amber
+        case "accel":             return RetroTheme.amberBright
+        case "cruise":            return RetroTheme.green
+        case "decel":             return RetroTheme.amber
+        case "stopping", "dwell": return RetroTheme.amberDim
+        case "hold":              return RetroTheme.cyan
+        case "manual":            return RetroTheme.cyan
+        case "eb":                return RetroTheme.red
+        case "idle":              return RetroTheme.greenDim
+        default:                  return RetroTheme.amber
         }
     }
 
-    // Mirror of DCLEngine.dynamicsState(for:) so the panel reads identical
-    // to MONITOR DYNAMICS in the shell.
+    // Mirror of DCLEngine.dynamicsState(for:) so the panel reads the same
+    // regimes as MONITOR DYNAMICS in the shell. Returns a key suffix; the
+    // row localizes it via "dynamics.state.<key>".
     private static func state(for train: Train) -> String {
-        if train.isEmergencyBrakeApplied || train.status == .emergency { return "FU" }
-        if train.doorsOpen { return "A QUAI" }
-        if train.isDepartureHold { return "HOLD" }
-        if train.mode == .manual { return "CML" }
-        if train.status == .stopped { return train.speed > 0.05 ? "STOPPING" : "IDLE" }
+        if train.isEmergencyBrakeApplied || train.status == .emergency { return "eb" }
+        if train.doorsOpen { return "dwell" }
+        if train.isDepartureHold { return "hold" }
+        if train.mode == .manual { return "manual" }
+        if train.status == .stopped { return train.speed > 0.05 ? "stopping" : "idle" }
         let cruising = train.speed >= train.consigneVitesse * 0.95 && train.consigneVitesse > 0.5
-        if train.speedError < -0.3 { return "DECEL" }
-        if cruising                { return "CRUISE" }
-        return "ACCEL"
+        if train.speedError < -0.3 { return "decel" }
+        if cruising                { return "cruise" }
+        return "accel"
     }
 }

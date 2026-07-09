@@ -1122,6 +1122,14 @@ extension HelpLibrary {
 
     SHOW MEMORY
 
+2 MODBUS
+  Displays the Modbus TCP register map (coils, discrete inputs including
+  the safety chain, holding registers, input registers) so external tools
+  such as mbpoll, pymodbus, OpenPLC and Node-RED can be wired to the right
+  addresses. The server listens on localhost port 5020.
+
+    SHOW MODBUS
+
 2 TIME
   Displays the current date and time.
 

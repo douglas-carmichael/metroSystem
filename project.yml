@@ -41,4 +41,7 @@ targets:
         NSHighResolutionCapable: true
         NSQuitAlwaysKeepsWindows: false
         NSPrincipalClass: NSApplication
+        NSLocalNetworkUsageDescription: "Discover other PCC nodes and ClusterDaemon peers on your local network via Bonjour."
+        NSBonjourServices:
+          - _metrosys._tcp
         ATSApplicationFontsPath: "."

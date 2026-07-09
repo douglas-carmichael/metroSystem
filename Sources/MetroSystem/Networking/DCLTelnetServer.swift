@@ -22,6 +22,7 @@ final class DCLTelnetServer: ObservableObject {
     @Published private(set) var sessionCount: Int = 0
 
     private weak var world: MetroWorld?
+    private weak var network: PeerNetwork?
     private weak var language: AppLanguage?
     private weak var sessionCoordinator: DCLSessionCoordinator?
 
@@ -35,9 +36,10 @@ final class DCLTelnetServer: ObservableObject {
 
     init() {}
 
-    func attach(world: MetroWorld, language: AppLanguage,
+    func attach(world: MetroWorld, network: PeerNetwork, language: AppLanguage,
                 sessionCoordinator: DCLSessionCoordinator) {
         self.world = world
+        self.network = network
         self.language = language
         self.sessionCoordinator = sessionCoordinator
     }
@@ -85,7 +87,7 @@ final class DCLTelnetServer: ObservableObject {
             return
         }
         let engine = DCLEngine(terminalKind: .network)
-        engine.attach(world: world, language: language)
+        engine.attach(world: world, network: network, language: language)
         // Join the shared session set so the in-universe mail writer is
         // elected across GUI windows and telnet connections alike.
         sessionCoordinator?.register(engine)

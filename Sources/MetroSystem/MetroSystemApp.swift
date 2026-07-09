@@ -5,13 +5,19 @@ import AppKit
 struct MetroSystemApp: App {
     @StateObject private var language: AppLanguage
     @StateObject private var world: MetroWorld
+    @StateObject private var network: PeerNetwork
     @StateObject private var telnet: DCLTelnetServer
+    @StateObject private var modbus: ModbusTCPServer
     @StateObject private var sessions = DCLSessionCoordinator()
 
     init() {
+        let peerId = UUID().uuidString
+        let label = Host.current().localizedName ?? "PCC"
         _language = StateObject(wrappedValue: AppLanguage())
-        _world = StateObject(wrappedValue: MetroWorld())
+        _world = StateObject(wrappedValue: MetroWorld(localPeerId: peerId, localPeerLabel: label))
+        _network = StateObject(wrappedValue: PeerNetwork(peerId: peerId, label: label))
         _telnet = StateObject(wrappedValue: DCLTelnetServer())
+        _modbus = StateObject(wrappedValue: ModbusTCPServer())
     }
 
     var body: some Scene {
@@ -19,7 +25,9 @@ struct MetroSystemApp: App {
             PCCControlWindow()
                 .environmentObject(language)
                 .environmentObject(world)
+                .environmentObject(network)
                 .environmentObject(telnet)
+                .environmentObject(modbus)
                 .onAppear { bootstrap() }
         }
         .windowResizability(.contentMinSize)
@@ -36,6 +44,7 @@ struct MetroSystemApp: App {
             MetroSceneWindow()
                 .environmentObject(language)
                 .environmentObject(world)
+                .environmentObject(network)
         }
         .windowResizability(.contentMinSize)
         .restorationDisabled()
@@ -49,6 +58,7 @@ struct MetroSystemApp: App {
             DCLShellWindow()
                 .environmentObject(language)
                 .environmentObject(world)
+                .environmentObject(network)
                 .environmentObject(sessions)
         } defaultValue: {
             DCLSessionID()
@@ -74,8 +84,13 @@ struct MetroSystemApp: App {
         }
         world.seedTrains()
         world.start()
-        telnet.attach(world: world, language: language, sessionCoordinator: sessions)
+        network.attach(world: world)
+        network.start()
+        telnet.attach(world: world, network: network, language: language,
+                      sessionCoordinator: sessions)
         telnet.start()
+        modbus.attach(world: world, network: network, telnet: telnet)
+        modbus.start()
     }
 
     /// Looks for another running MetroSystem process on this Mac. A second

@@ -14,6 +14,7 @@ extension DCLEngine {
         case matches(what, "USERS",       min: 4): return showUsers()
         case matches(what, "DEVICES",     min: 3): return showDevices()
         case matches(what, "MEMORY",      min: 3): return showMemory()
+        case matches(what, "MODBUS",      min: 3): return showModbus()
         case matches(what, "TIME"):                return showTime()
         case matches(what, "NETWORK",     min: 3): return showNetwork()
         case matches(what, "RAMES",       min: 4): return showFleet()
@@ -299,9 +300,16 @@ extension DCLEngine {
 
     func showUsers() -> String {
         var s = "\n       OpenVMS User Processes at \(stamp(Date()))\n"
-        s += "       Total number of users = 1, number of processes = \((world?.trains.count ?? 0) + 4)\n\n"
+        s += "       Total number of users = \(1 + (network?.peers.count ?? 0)), number of processes = \((world?.trains.count ?? 0) + 4)\n\n"
         s += "  Username     Process Name         PID      Terminal\n"
         s += "  \(username.padding(toLength: 12, withPad: " ", startingAt: 0)) DCL_\(username.prefix(12).padding(toLength: 16, withPad: " ", startingAt: 0)) \(pid) \(terminalName)\n"
+        for (i, peer) in (network?.peers ?? []).enumerated() {
+            let upper = peer.displayName.uppercased().filter { $0.isLetter || $0.isNumber || $0 == "_" }
+            let uname = String(upper.prefix(12)).padding(toLength: 12, withPad: " ", startingAt: 0)
+            let pname = "DCL_" + String(upper.prefix(12)).padding(toLength: 16, withPad: " ", startingAt: 0)
+            let ppid = String(format: "%08X", 0x0500 + i)
+            s += "  \(uname) \(pname) \(ppid) TT$NTA00\(i + 1):\n"
+        }
         return s
     }
 
@@ -412,6 +420,77 @@ extension DCLEngine {
         return "  \(stamp(Date()))\n"
     }
 
+    /// SHOW MODBUS -- summary of the Modbus TCP register map so an external
+    /// tool (mbpoll, pymodbus, OpenPLC, Node-RED) can be wired to the right
+    /// addresses. Localized (it is LPD-facing lab documentation, like the
+    /// PCC panel's M-key legend, which shows the same map).
+    func showModbus() -> String {
+        let n = ModbusTCPServer.maxTrains
+        let sb = ModbusTCPServer.scalarBase
+        func row(_ addr: String, _ text: String) -> String {
+            "    " + addr.padding(toLength: 10, withPad: " ", startingAt: 0) + text + "\n"
+        }
+        func grp(_ g: Int) -> String { "\(g*n)..\(g*n + n - 1)" }
+
+        var s = "\n  " + tr("modbus.legend.title") + "\n"
+        s += "  " + tr("modbus.legend.endpoint") + "\n\n"
+
+        s += "  " + tr("modbus.legend.coil") + "\n"
+        s += row(grp(0), tr("modbus.reg.dooropen"))
+        s += row(grp(1), tr("modbus.reg.doorclose"))
+        s += row(grp(2), tr("modbus.reg.fuset"))
+        s += row(grp(3), tr("modbus.reg.furelease")) + "\n"
+
+        s += "  " + tr("modbus.legend.di") + "\n"
+        s += row(grp(0), tr("modbus.reg.local"))
+        s += row(grp(1), tr("modbus.reg.moving"))
+        s += row(grp(2), tr("modbus.reg.doorsopen"))
+        s += row(grp(3), tr("modbus.reg.fuapplied"))
+        s += row(grp(4), tr("modbus.reg.faultdoor"))
+        s += row(grp(5), tr("modbus.reg.faulttraction"))
+        s += row(grp(6), tr("modbus.reg.faultbrake"))
+        s += row(grp(7), tr("modbus.reg.faultctc"))
+        s += row(grp(8), tr("modbus.reg.faultslip"))
+        s += row(grp(9), tr("modbus.reg.faultslide"))
+        s += "  " + tr("modbus.legend.chain") + "\n"
+        s += row(grp(10), tr("modbus.chain.doorinterlock"))
+        s += row(grp(11), tr("modbus.chain.overspeed"))
+        s += row(grp(12), tr("modbus.chain.ma"))
+        s += row(grp(13), tr("modbus.chain.brake"))
+        s += row(grp(14), tr("modbus.chain.adhesion"))
+        s += row(grp(15), tr("modbus.chain.intact")) + "\n"
+
+        s += "  " + tr("modbus.legend.hr") + "\n"
+        s += row(grp(0), tr("modbus.reg.mode"))
+        s += row(grp(1), tr("modbus.reg.setspeed")) + "\n"
+
+        s += "  " + tr("modbus.legend.ir") + "\n"
+        s += row(grp(0), tr("modbus.reg.position"))
+        s += row(grp(1), tr("modbus.reg.speed"))
+        s += row(grp(2), tr("modbus.reg.consigne"))
+        s += row(grp(3), tr("modbus.reg.ma"))
+        s += row(grp(4), tr("modbus.reg.pax"))
+        s += row(grp(5), tr("modbus.reg.status"))
+        s += row(grp(6), tr("modbus.reg.canton"))
+        s += row(grp(7), tr("modbus.reg.tire"))
+        s += row("\(sb+0)",  tr("modbus.reg.traincount"))
+        s += row("\(sb+1)",  tr("modbus.reg.peers"))
+        s += row("\(sb+2)",  tr("modbus.reg.cantoncount"))
+        s += row("\(sb+3)",  tr("modbus.reg.telnet"))
+        s += row("\(sb+4)",  tr("modbus.reg.clients"))
+        s += row("\(sb+5)",  tr("modbus.reg.linemode"))
+        s += row("\(sb+6)",  tr("modbus.reg.spfrom"))
+        s += row("\(sb+7)",  tr("modbus.reg.spto"))
+        s += row("\(sb+8)",  tr("modbus.reg.spheadway"))
+        s += row("\(sb+9)",  tr("modbus.reg.alarms"))
+        s += row("\(sb+10)", tr("modbus.reg.severity"))
+        s += row("\(sb+11)", tr("modbus.reg.unack"))
+        s += row("\(sb+12)", tr("modbus.reg.shelved"))
+        s += row("\(sb+13)", tr("modbus.reg.rtn"))
+        s += row("\(sb+14)", tr("modbus.reg.tracklen"))
+        return s
+    }
+
     func showNetwork() -> String {
         // Header, separator and every data row share one fixed-width builder
         // so the columns line up regardless of node-name / count widths.
@@ -429,7 +508,16 @@ extension DCLEngine {
         var s = "\n" + row("Node", "State", "Active Links", "Delay", "Cost", "Hops", "Name")
         s += row("----", "-----", "------------", "-----", "----", "----", "----")
         s += row("1.1", "LOCAL", "2", "0", "0", "0", nodeName)
-        s += row("-", "-", "-", "-", "-", "-", "(no adjacent nodes)")
+        if let peers = network?.peers, !peers.isEmpty {
+            for (i, peer) in peers.enumerated() {
+                let addr = "1.\(2 + i)"
+                let upper = peer.displayName.uppercased().filter { $0.isLetter || $0.isNumber || $0 == "_" }
+                let nm = String(upper.prefix(6))
+                s += row(addr, "REACHABLE", "1", "\(2 + i)", "1", "1", nm)
+            }
+        } else {
+            s += row("-", "-", "-", "-", "-", "-", "(no adjacent nodes)")
+        }
         return s
     }
 
@@ -522,14 +610,14 @@ extension DCLEngine {
         let stdMode = (language?.standardOverride == nil)
             ? tr("dcl.set.standard.followlang") : tr("dcl.set.standard.override")
         s += String(format: tr("dcl.status.standard"), safetyStandard.label, stdMode) + "\n"
-        // Per-rame overrides (only shown when any rame is non-nominal).
+        // Per-train overrides (only shown when any train is non-nominal).
         if let trains = world?.trains,
            trains.contains(where: { $0.mode == .manual || $0.isEmergencyBrakeApplied }) {
             for t in trains where t.mode == .manual || t.isEmergencyBrakeApplied {
                 var flags: [String] = []
-                if t.mode == .manual { flags.append("CONDUITE-MANUELLE") }
-                if t.isEmergencyBrakeApplied { flags.append("FU") }
-                s += "    Rame \(t.label): \(flags.joined(separator: " + "))\n"
+                if t.mode == .manual { flags.append("MANUAL-DRIVING") }
+                if t.isEmergencyBrakeApplied { flags.append("EMERG-BRAKE") }
+                s += "    Train \(t.label): \(flags.joined(separator: " + "))\n"
             }
         }
         return s
@@ -541,14 +629,14 @@ extension DCLEngine {
         case .stopped:
             return "SERVICE STOPPED"
         case .normal:
-            return "NORMAL  (conduite automatique intégrale)"
+            return "NORMAL  (full automatic operation)"
         case .serviceProvisoire:
             if let sp = world.activeSP {
                 return "\(sterm("safety.sp"))  (\(world.stationName(id: sp.startStationId)) <-> \(world.stationName(id: sp.endStationId)), \(Int(sp.intervalle))s)"
             }
             return sterm("safety.sp")
         case .emergency:
-            return "ARRET D'URGENCE GENERAL  (FU on all rames)"
+            return "GENERAL EMERGENCY STOP  (emergency brake on all trains)"
         }
     }
 
@@ -676,6 +764,12 @@ extension DCLEngine {
         s += "│   NODE      SOFTWARE   STATUS │\n"
         s += "├\(bar)┤\n"
         s += "│  \(nodeName.padding(toLength: 8, withPad: " ", startingAt: 0))  VMS V\(osVersion.dropFirst())  MEMBER │\n"
+        if let peers = network?.peers {
+            for peer in peers {
+                let nm = peer.displayName.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(8)
+                s += "│  \(String(nm).padding(toLength: 8, withPad: " ", startingAt: 0))  VMS V\(osVersion.dropFirst())  MEMBER │\n"
+            }
+        }
         s += "└\(bar)┘\n"
         return s
     }
@@ -683,7 +777,18 @@ extension DCLEngine {
     func showConnections() -> String {
         var s = "\nLogical Link  Node      Process       Remote link  Remote user\n"
         s += "============  ====      =======       ===========  ===========\n"
-        s += "       (no active links)\n"
+        if let peers = network?.peers, !peers.isEmpty {
+            for (i, peer) in peers.enumerated() {
+                let nm = peer.displayName.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(8)
+                let nodePad = ("\(nm)::").padding(toLength: 9, withPad: " ", startingAt: 0)
+                let procPad = "CTC_RADIOSRV".padding(toLength: 13, withPad: " ", startingAt: 0)
+                s += String(format: "%-13d %@ %@ %-12d %@\n",
+                            32768 + i, nodePad, procPad,
+                            32768 + i + 1, "_METROSYS")
+            }
+        } else {
+            s += "       (no active links)\n"
+        }
         return s
     }
 

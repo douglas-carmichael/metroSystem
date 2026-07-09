@@ -1,0 +1,34 @@
+name: macOS app
+
+# Builds the XcodeGen-generated MetroSystem app on macOS. The .xcodeproj is
+# .gitignore'd (generated from project.yml), so CI installs XcodeGen, runs
+# `xcodegen generate`, then builds the app scheme.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (Debug, macOS)
+        run: |
+          xcodebuild \
+            -project MetroSystem.xcodeproj \
+            -scheme MetroSystem \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            build

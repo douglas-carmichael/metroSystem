@@ -26,8 +26,14 @@
 	<string>public.app-category.simulation</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_metrosys._tcp</string>
+	</array>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Discover other PCC nodes and ClusterDaemon peers on your local network via Bonjour.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSQuitAlwaysKeepsWindows</key>

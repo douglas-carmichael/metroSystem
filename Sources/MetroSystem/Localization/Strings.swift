@@ -1,5 +1,20 @@
 import Foundation
 
+// LANGUAGE DISCIPLINE.
+//
+// The UI is strictly bilingual: in EN mode no French appears and in FR
+// mode no English appears, with three deliberate in-universe exceptions:
+//   * OpenVMS SYSTEM messages / tables in the DCL terminal stay English in
+//     both modes (real VMS shipped English-only); only LPD layered-product
+//     content (VALCP, diagnostics, alarms display) localizes.
+//   * Identifiers are language-neutral and identical in both modes: DCL
+//     verbs and qualifiers, SCADA source/point tags (RAME 101, PNEU,
+//     CTC_RADIO...), VMS process/facility names, and proper nouns
+//     (station names, VAL, PCC, LPD).
+//   * The FR domain acronyms every French metro document uses (CAI, CML,
+//     FU, SP) render as their EN counterparts in EN mode (ATO, MAN, EB,
+//     TEMP SERVICE).
+
 enum Strings {
     static let table: [String: [Lang: String]] = buildTable()
 
@@ -23,15 +38,16 @@ enum Strings {
             t[key] = [.en: en, .fr: fr]
         }
 
-        add("window.control",       "PCC Dispatcher",                      "Poste de commande centralisé")
+        add("window.control",       "PCC Dispatcher",                      "Régulation PCC")
         add("window.scene",         "Line Synoptic 3D",                    "Synoptique de ligne 3D")
         add("window.dcl",           "DCL Terminal",                        "Terminal DCL")
-        add("window.dynamics",      "Dynamics",                            "Dynamiques")
+        add("window.dynamics",      "Train Dynamics",                      "Dynamique des rames")
 
         add("credits.title",        "CREDITS",                             "CRÉDITS")
         add("credits.dismiss",      "Click or press ESC to close",         "Cliquez ou appuyez ESC pour fermer")
         add("credits.role.metro",   "CBTC METRO SIMULATION",               "SIMULATION MÉTRO CBTC")
         add("credits.role.retro",   "RETRO UI & OpenVMS DCL SHELL",        "UI RÉTRO & SHELL DCL OpenVMS")
+        add("credits.metro.detail", "After the DC CBTC metro simulator",   "D'après le simulateur de métro DC CBTC")
 
         add("banner.title",         "PCC — METRO LINE 1",                  "PCC — MÉTRO LIGNE 1")
         add("banner.subtitle",      "VSI OpenVMS V9.2-3   TERMINAL VT320", "VSI OpenVMS V9.2-3   TERMINAL VT320")
@@ -54,7 +70,7 @@ enum Strings {
                                 "Contrôle des trains par communication -- ligne 1 (VAL 208)")
         add("login.lpd.line2",  "Diagnostic images available (RUN <image> or DIAGNOSE):",
                                 "Images de diagnostic disponibles (RUN <image> ou DIAGNOSE) :")
-        add("login.lpd.frein",  "  RUN FREIN_TEST       Brake-state audit on every rame",
+        add("login.lpd.frein",  "  RUN FREIN_TEST       Brake-state audit on every train",
                                 "  RUN FREIN_TEST       Audit des freins de chaque rame")
         add("login.lpd.portes", "  RUN PORTES_TEST      Door cycle + traction-interlock test",
                                 "  RUN PORTES_TEST      Cycle des portes + test d'asservissement traction")
@@ -67,15 +83,23 @@ enum Strings {
 
         // Status strip.
         add("status.node",          "NODE",                                "NŒUD")
-        add("status.rames",         "RAMES",                               "RAMES")
+        add("status.peers",         "PEERS",                               "PAIRS")
+        add("status.peers.none",    "NONE",                                "AUCUN")
+        add("status.peers.node",    "NODE",                                "NŒUD")
+        add("status.peers.nodes",   "NODES",                               "NŒUDS")
+        add("status.rames",         "TRAINS",                              "RAMES")
         add("status.telnet",        "TELNET",                              "TELNET")
         add("status.telnet.none",   "NONE",                                "AUCUNE")
         add("status.telnet.one",    "1 SESSION",                           "1 SESSION")
         add("status.telnet.many",   "%d SESSIONS",                         "%d SESSIONS")
+        add("status.modbus",        "MODBUS",                              "MODBUS")
+        add("status.modbus.none",   "NONE",                                "AUCUN")
+        add("status.modbus.one",    "1 CLIENT",                            "1 CLIENT")
+        add("status.modbus.many",   "%d CLIENTS",                          "%d CLIENTS")
         add("status.mode",          "MODE",                                "MODE")
         add("status.mode.stopped",  "SERVICE STOPPED",                     "SERVICE ARRÊTÉ")
-        add("status.mode.normal",   "NORMAL (CAI)",                        "NORMAL (CAI)")
-        add("status.mode.sp",       "SERVICE PROVISOIRE",                  "SERVICE PROVISOIRE")
+        add("status.mode.normal",   "NORMAL (ATO)",                        "NORMAL (CAI)")
+        add("status.mode.sp",       "TEMP SERVICE (SP)",                   "SERVICE PROVISOIRE")
         add("status.mode.emergency","EMERGENCY STOP",                      "ARRÊT D'URGENCE")
         add("status.ready",         "READY",                               "PRÊT")
         add("status.alarms",        "ALARMS",                              "ALARMES")
@@ -83,25 +107,25 @@ enum Strings {
         add("status.alarms.summary","%d ACT / %d UNACK",                   "%d ACT / %d N.ACQ")
 
         // HUD (3D synoptic).
-        add("hud.rames",            "RAMES",                               "RAMES")
+        add("hud.rames",            "TRAINS",                              "RAMES")
         add("hud.mode",             "MODE",                                "MODE")
         add("scene.recenter",       "RECENTER",                            "RECENTRER")
-        add("scene.isolate",        "FOLLOW RAME",                         "SUIVRE RAME")
-        add("scene.isolated.prefix","FOLLOWING",                           "SUIVI DE")
+        add("scene.isolate",        "FOLLOW TRAIN",                        "SUIVRE RAME")
+        add("scene.isolated.prefix","FOLLOWING:",                          "SUIVI :")
 
         // Line control panel.
         add("line.panel.title",     "LINE CONTROL",                        "COMMANDE DE LIGNE")
         add("line.service.start",   "START SERVICE",                       "DÉBUT DE SERVICE")
         add("line.service.stop",    "STOP SERVICE",                        "FIN DE SERVICE")
         add("line.emergency",       "EMERGENCY STOP",                      "ARRÊT D'URGENCE")
-        add("line.addtrain",        "ADD RAME",                            "AJOUTER RAME")
-        add("line.sp.label",        "SERVICE PROVISOIRE",                  "SERVICE PROVISOIRE")
+        add("line.addtrain",        "ADD TRAIN",                           "AJOUTER RAME")
+        add("line.sp.label",        "TEMP SERVICE (SP)",                   "SERVICE PROVISOIRE")
         add("line.sp.from",         "FROM",                                "DE")
         add("line.sp.to",           "TO",                                  "À")
         add("line.sp.interval",     "HEADWAY",                             "INTERVALLE")
         add("line.sp.engage",       "ENGAGE",                              "ENGAGER")
         add("line.sp.clear",        "CLEAR",                               "LEVER")
-        add("line.sp.active",       "SP active: %@ <-> %@  (headway %d s)",
+        add("line.sp.active",       "Temp service active: %@ <-> %@  (headway %d s)",
                                     "SP actif : %@ <-> %@  (intervalle %d s)")
 
         // SCADA alarm panel.
@@ -131,15 +155,15 @@ enum Strings {
         add("alarm.status.shlvd",   "SHLVD",                               "SUSP")
 
         // Alarm messages (stored in EN in the log; localized on display).
-        add("alarm.msg.emergency",  "General emergency stop: FU commanded on every rame",
+        add("alarm.msg.emergency",  "General emergency stop: emergency brake commanded on every train",
                                     "Arrêt d'urgence général : FU commandé sur toutes les rames")
-        add("alarm.msg.sp",         "Service provisoire in force; ZC barriers protect the barred section",
+        add("alarm.msg.sp",         "Temporary service in force; ZC barriers protect the barred section",
                                     "Service provisoire en vigueur ; barrières ZC sur la section neutralisée")
-        add("alarm.msg.overspeed",  "ATP overspeed: speed above commanded consigne",
+        add("alarm.msg.overspeed",  "ATP overspeed: speed above commanded setpoint",
                                     "Survitesse ATP : vitesse au-dessus de la consigne")
         add("alarm.msg.malimit",    "Movement-authority limit encroached",
                                     "Empiètement sur la limite d'autorisation de mouvement")
-        add("alarm.msg.fu",         "Emergency brake (FU) commanded",
+        add("alarm.msg.fu",         "Emergency brake commanded",
                                     "Freinage d'urgence (FU) commandé")
         add("alarm.msg.doorfault",  "Door fault: interlock chain open",
                                     "Défaut portes : chaîne d'asservissement ouverte")
@@ -149,9 +173,9 @@ enum Strings {
                                     "Défaut frein : freinage de service dégradé")
         add("alarm.msg.signalfault","CTC radio fault: movement authority lost",
                                     "Défaut radio CTC : autorisation de mouvement perdue")
-        add("alarm.msg.patinage",   "Wheel slip (patinage) detected under traction",
+        add("alarm.msg.patinage",   "Wheel slip detected under traction",
                                     "Patinage détecté en traction")
-        add("alarm.msg.enrayage",   "Wheel slide (enrayage) detected under braking",
+        add("alarm.msg.enrayage",   "Wheel slide detected under braking",
                                     "Enrayage détecté au freinage")
         add("alarm.msg.tirelow",    "Tire pressure low on at least one position",
                                     "Pression basse sur au moins un pneu")
@@ -163,7 +187,7 @@ enum Strings {
                                     "Charge voyageurs à 80 % de la capacité ou plus")
         add("alarm.msg.doorheld",   "Doors held open beyond dwell",
                                     "Portes maintenues ouvertes au-delà du stationnement")
-        add("alarm.msg.controller", "PCC controller watchdog fault -- all rames held",
+        add("alarm.msg.controller", "PCC controller watchdog fault -- all trains held",
                                     "Défaut chien de garde PCC -- toutes rames retenues")
         add("alarm.msg.power",      "750 V traction supply fault",
                                     "Défaut alimentation traction 750 V")
@@ -176,11 +200,15 @@ enum Strings {
         add("alarm.msg.switch",     "Point machine slow to lock",
                                     "Aiguille lente au verrouillage")
 
-        // Per-rame panels.
-        add("train.rame",           "RAME",                                "RAME")
-        add("train.mode.cai",       "CAI",                                 "CAI")
-        add("train.mode.cml",       "CML",                                 "CML")
-        add("train.canton",         "CANTON",                              "CANTON")
+        // Per-train panels.
+        add("train.rame",           "TRAIN",                               "RAME")
+        add("train.tag.local",      "LOCAL",                               "LOCALE")
+        add("train.tag.remote",     "REMOTE",                              "DISTANTE")
+        add("train.mode.cai",       "ATO",                                 "CAI")
+        add("train.mode.cml",       "MAN",                                 "CML")
+        add("train.canton",         "BLOCK",                               "CANTON")
+        add("block.name",           "Block %d",                            "Canton %d")
+        add("block.short",          "B%d",                                 "C%d")
         add("train.speed",          "SPEED",                               "VITESSE")
         add("train.ma",             "MA",                                  "AM")
         add("train.doors",          "DOORS",                               "PORTES")
@@ -189,13 +217,25 @@ enum Strings {
         add("train.status",         "STATUS",                              "ÉTAT")
         add("train.status.stopped", "STOPPED",                             "ARRÊT")
         add("train.status.moving",  "MOVING",                              "EN MARCHE")
-        add("train.status.emergency","FU",                                 "FU")
+        add("train.status.emergency","EB",                                 "FU")
         add("train.status.docked",  "AT PLATFORM",                         "À QUAI")
         add("train.faults",         "FAULTS",                              "DÉFAUTS")
         add("train.faults.label",   "FAULT INJECTION",                     "INJECTION DE DÉFAUTS")
         add("train.manual.speed",   "MANUAL SPEED",                        "VITESSE MANUELLE")
         add("train.tires.label",    "TIRES",                               "PNEUS")
         add("train.tires.hint",     "(click to cycle)",                    "(cliquer pour changer)")
+        add("train.tire.ok",        "OK",                                  "OK")
+        add("train.tire.low",       "LOW PRESSURE",                        "PRESSION BASSE")
+        add("train.tire.puncture",  "PUNCTURE",                            "CREVAISON")
+        add("train.tire.burst",     "BURST",                               "ÉCLATEMENT")
+
+        // Fault names (panel chips, fault summaries, VALCP fault lists).
+        add("fault.portes",         "DOORS",                               "PORTES")
+        add("fault.traction",       "TRACTION",                            "TRACTION")
+        add("fault.frein",          "BRAKE",                               "FREIN")
+        add("fault.ctc",            "CTC RADIO",                           "RADIO CTC")
+        add("fault.patinage",       "SLIP",                                "PATINAGE")
+        add("fault.enrayage",       "SLIDE",                               "ENRAYAGE")
 
         add("door.open",            "OPEN",                                "OUVERTES")
         add("door.closed",          "CLOSED",                              "FERMÉES")
@@ -205,24 +245,26 @@ enum Strings {
         add("btn.mode.label",       "MODE",                                "MODE")
         add("btn.mode.auto",        "AUTO",                                "AUTO")
         add("btn.mode.manual",      "MANUAL",                              "MANUEL")
-        add("btn.fu",               "FU",                                  "FU")
+        add("btn.fu",               "EB",                                  "FU")
         add("btn.remove",           "WITHDRAW",                            "RETIRER")
 
         // Footer / help.
-        add("hint.line",            "TAB rame · O/C doors · A mode · F FU · E emergency · ?/F1 help",
-                                    "TAB rame · O/C portes · A mode · F FU · E urgence · ?/F1 aide")
+        add("hint.line",            "TAB train · O/C doors · A mode · F EB · E emergency · M Modbus · ?/F1 help",
+                                    "TAB rame · O/C portes · A mode · F FU · E urgence · M Modbus · ?/F1 aide")
         add("hint.lang",            "LANG",                                "LANGUE")
         add("help.title",           "KEYBOARD HELP",                       "AIDE CLAVIER")
         add("help.dismiss",         "Press ESC, ? or click to dismiss",    "Appuyez ESC, ? ou cliquez pour fermer")
-        add("help.focus.hint",      "FOCUSED RAME",                        "RAME SÉLECTIONNÉE")
+        add("help.focus.hint",      "FOCUSED TRAIN",                       "RAME SÉLECTIONNÉE")
         add("help.k.help",          "Show / hide this help",               "Afficher / masquer cette aide")
-        add("help.k.tab",           "Cycle the focused rame",              "Changer la rame sélectionnée")
+        add("help.k.tab",           "Cycle the focused train",             "Changer la rame sélectionnée")
         add("help.k.lang",          "Switch language (EN / FR)",           "Changer de langue (EN / FR)")
-        add("help.k.doors",         "Open / close focused rame's doors",   "Ouvrir / fermer les portes de la rame")
-        add("help.k.mode",          "Toggle AUTO / MANUAL on the focused rame",
+        add("help.k.doors",         "Open / close the focused train's doors", "Ouvrir / fermer les portes de la rame")
+        add("help.k.mode",          "Toggle AUTO / MANUAL on the focused train",
                                     "Basculer AUTO / MANUEL sur la rame")
-        add("help.k.fu",            "Toggle the FU on the focused rame",   "Basculer le FU sur la rame")
+        add("help.k.fu",            "Toggle the emergency brake (EB) on the focused train",
+                                    "Basculer le FU sur la rame sélectionnée")
         add("help.k.emergency",     "Toggle the line-wide emergency stop", "Basculer l'arrêt d'urgence général")
+        add("help.k.modbus",        "Show the Modbus register map",        "Afficher la carte des registres Modbus")
         add("help.k.dcl",           "Open a DCL terminal",                 "Ouvrir un terminal DCL")
         add("help.k.scene",         "Open the 3D line synoptic",           "Ouvrir le synoptique 3D")
         add("help.k.dynamics",      "Open the dynamics scope",             "Ouvrir l'oscilloscope dynamique")
@@ -230,26 +272,94 @@ enum Strings {
         add("help.k.esc",           "Dismiss overlays",                    "Fermer les fenêtres superposées")
 
         // Dynamics window.
-        add("dynamics.title",       "RAME DYNAMICS — ASSERVISSEMENT",      "DYNAMIQUE DES RAMES — ASSERVISSEMENT")
-        add("dynamics.empty",       "(no rames in service)",               "(aucune rame en service)")
-        add("dynamics.select.label","RAMES",                               "RAMES")
+        add("dynamics.title",       "TRAIN DYNAMICS — SPEED REGULATION",   "DYNAMIQUE DES RAMES — ASSERVISSEMENT")
+        add("dynamics.empty",       "(no trains in service)",              "(aucune rame en service)")
+        add("dynamics.select.label","TRAINS",                              "RAMES")
         add("dynamics.select.empty","(none)",                              "(aucune)")
         add("dynamics.select.all",  "ALL",                                 "TOUTES")
         add("dynamics.select.none", "NONE",                                "AUCUNE")
-        add("dynamics.col.rame",    "RAME",                                "RAME")
+        add("dynamics.col.rame",    "TRAIN",                               "RAME")
         add("dynamics.col.pos",     "POSITION",                            "POSITION")
         add("dynamics.col.vel",     "SPEED",                               "VITESSE")
-        add("dynamics.col.consigne","CONSIGNE",                            "CONSIGNE")
+        add("dynamics.col.consigne","SETPOINT",                            "CONSIGNE")
         add("dynamics.col.acc",     "ACCEL",                               "ACCÉL")
         add("dynamics.col.ma",      "MA",                                  "AM")
         add("dynamics.col.state",   "STATE",                               "ÉTAT")
+        add("dynamics.state.accel", "ACCEL",                               "ACCÉL")
+        add("dynamics.state.cruise","CRUISE",                              "PALIER")
+        add("dynamics.state.decel", "DECEL",                               "DÉCÉL")
+        add("dynamics.state.stopping","STOPPING",                          "ARRÊT EN COURS")
+        add("dynamics.state.idle",  "IDLE",                                "REPOS")
+        add("dynamics.state.dwell", "DWELL",                               "À QUAI")
+        add("dynamics.state.manual","MANUAL",                              "CML")
+        add("dynamics.state.eb",    "EB",                                  "FU")
+        add("dynamics.state.hold",  "HOLD",                                "RETENUE")
         add("dynamics.trace.title", "SPEED TRACE",                         "TRACÉ DE VITESSE")
         add("dynamics.trace.axis",  "60 s window · line speed dashed",     "fenêtre 60 s · vitesse ligne en tirets")
         add("dynamics.trace.empty", "(collecting samples...)",             "(acquisition en cours...)")
-        add("dynamics.profile.limits","LIMITS",                            "LIMITES")
+        add("dynamics.profile.fmt", "LIMITS  V %.1f m/s · accel %.2f m/s² · service brake %.2f m/s² · EB %.2f m/s²",
+                                    "LIMITES  V %.1f m/s · accél %.2f m/s² · frein de service %.2f m/s² · FU %.2f m/s²")
         add("dynamics.refresh",     "Sampling every 500 ms",               "Échantillonnage toutes les 500 ms")
-        add("dynamics.state.gloss", "ACCEL accélération · CRUISE palier · DECEL freinage · A QUAI stationnement · CML conduite manuelle · FU freinage d'urgence · HOLD retenue intervalle",
-                                    "ACCEL accélération · CRUISE palier · DECEL freinage · A QUAI stationnement · CML conduite manuelle · FU freinage d'urgence · HOLD retenue intervalle")
+
+        // Modbus legend (PCC overlay + SHOW MODBUS).
+        add("modbus.legend.title",  "MODBUS TCP REGISTER MAP",             "CARTE DES REGISTRES MODBUS TCP")
+        add("modbus.legend.endpoint","Endpoint: localhost port 5020 · unit-id ignored · FC 01/02/03/04/05/06/0F/10",
+                                    "Point d'accès : localhost port 5020 · unit-id ignoré · FC 01/02/03/04/05/06/0F/10")
+        add("modbus.legend.coil",   "COILS (R/W, FC 01/05) — pulse-on commands",
+                                    "COILS (L/É, FC 01/05) — commandes à impulsion")
+        add("modbus.legend.di",     "DISCRETE INPUTS (RO, FC 02)",         "ENTRÉES TOR (LS, FC 02)")
+        add("modbus.legend.hr",     "HOLDING REGISTERS (R/W, FC 03/06)",   "REGISTRES DE MAINTIEN (L/É, FC 03/06)")
+        add("modbus.legend.ir",     "INPUT REGISTERS (RO, FC 04)",         "REGISTRES D'ENTRÉE (LS, FC 04)")
+        add("modbus.legend.chain",  "SAFETY CHAIN (1 = contact closed / healthy)",
+                                    "CHAÎNE DE SÉCURITÉ (1 = contact fermé / sain)")
+        add("modbus.reg.dooropen",  "Door OPEN command per train",         "Commande OUVERTURE portes par rame")
+        add("modbus.reg.doorclose", "Door CLOSE command per train",        "Commande FERMETURE portes par rame")
+        add("modbus.reg.fuset",     "EB SET (command emergency brake)",    "FU SERRÉ (commander le freinage d'urgence)")
+        add("modbus.reg.furelease", "EB RELEASE",                          "FU RELÂCHÉ")
+        add("modbus.reg.local",     "Train is locally owned",              "Rame pilotée par ce nœud")
+        add("modbus.reg.moving",    "Train is moving",                     "Rame en mouvement")
+        add("modbus.reg.doorsopen", "Doors open",                          "Portes ouvertes")
+        add("modbus.reg.fuapplied", "Emergency brake applied",             "Freinage d'urgence appliqué")
+        add("modbus.reg.faultdoor", "Door fault latched",                  "Défaut portes verrouillé")
+        add("modbus.reg.faulttraction","Traction fault latched",           "Défaut traction verrouillé")
+        add("modbus.reg.faultbrake","Brake fault latched",                 "Défaut frein verrouillé")
+        add("modbus.reg.faultctc",  "CTC radio fault latched",             "Défaut radio CTC verrouillé")
+        add("modbus.reg.faultslip", "Wheel slip latched",                  "Patinage verrouillé")
+        add("modbus.reg.faultslide","Wheel slide latched",                 "Enrayage verrouillé")
+        add("modbus.chain.doorinterlock","Door interlock proven",          "Asservissement portes prouvé")
+        add("modbus.chain.overspeed","Overspeed governor OK",              "Contrôle de survitesse OK")
+        add("modbus.chain.ma",      "MA margin OK (not encroached)",       "Marge d'AM OK (pas d'empiètement)")
+        add("modbus.chain.brake",   "Service brake OK",                    "Frein de service OK")
+        add("modbus.chain.adhesion","Adhesion OK (no burst tire)",         "Adhérence OK (aucun pneu éclaté)")
+        add("modbus.chain.intact",  "Safety chain intact (series loop)",   "Chaîne de sécurité intacte (boucle série)")
+        add("modbus.reg.mode",      "Mode (0 = Manual, 1 = Auto)",         "Mode (0 = Manuel, 1 = Auto)")
+        add("modbus.reg.setspeed",  "Manual speed setpoint x10 (m/s)",     "Consigne manuelle x10 (m/s)")
+        add("modbus.reg.position",  "Position x10 (metres)",               "Position x10 (mètres)")
+        add("modbus.reg.speed",     "Speed x100, signed (+fwd / -rev)",    "Vitesse x100, signée (+avant / -arrière)")
+        add("modbus.reg.consigne",  "Speed setpoint x100",                 "Consigne de vitesse x100")
+        add("modbus.reg.ma",        "Movement-authority distance x10 (m)", "Distance d'autorisation de mouvement x10 (m)")
+        add("modbus.reg.pax",       "Passenger count",                     "Nombre de voyageurs")
+        add("modbus.reg.status",    "Status (0 stop, 1 run, 2 EB, 3 platform)",
+                                    "État (0 arrêt, 1 marche, 2 FU, 3 à quai)")
+        add("modbus.reg.canton",    "Canton number",                       "Numéro de canton")
+        add("modbus.reg.tire",      "Worst tire (0 OK .. 3 burst)",        "Pire pneu (0 OK .. 3 éclaté)")
+        add("modbus.reg.traincount","Trains known (local + remote)",       "Rames connues (locales + distantes)")
+        add("modbus.reg.peers",     "Remote peers connected",              "Nœuds pairs connectés")
+        add("modbus.reg.cantoncount","Canton count",                       "Nombre de cantons")
+        add("modbus.reg.telnet",    "Telnet sessions",                     "Sessions telnet")
+        add("modbus.reg.clients",   "Modbus clients connected",            "Clients Modbus connectés")
+        add("modbus.reg.linemode",  "Line mode (0 stop, 1 normal, 2 SP, 3 emerg)",
+                                    "Mode ligne (0 arrêt, 1 normal, 2 SP, 3 urgence)")
+        add("modbus.reg.spfrom",    "Temp-service start station (0 none)", "Station de départ du SP (0 aucun)")
+        add("modbus.reg.spto",      "Temp-service end station (0 none)",   "Station d'arrivée du SP (0 aucun)")
+        add("modbus.reg.spheadway", "Temp-service headway (s)",            "Intervalle du SP (s)")
+        add("modbus.reg.alarms",    "Active SCADA alarms",                 "Alarmes SCADA actives")
+        add("modbus.reg.severity",  "Highest severity (0 none .. 4 critical)",
+                                    "Gravité maximale (0 aucune .. 4 critique)")
+        add("modbus.reg.unack",     "Unacknowledged alarms (UNACK)",       "Alarmes non acquittées (N.ACQ)")
+        add("modbus.reg.shelved",   "Shelved alarms (SHLVD)",              "Alarmes suspendues (SUSP)")
+        add("modbus.reg.rtn",       "Returned-to-normal, unacked (RTN)",   "Retour à la normale, non acquittées (RAN)")
+        add("modbus.reg.tracklen",  "Track length (metres)",               "Longueur de la voie (mètres)")
 
         // DCL generic bits.
         add("dcl.page.more",        "  -- more (%d/%d) -- RETURN for next page, Q to quit --\n",
@@ -329,15 +439,18 @@ enum Strings {
         add("valcp.cmd.sysnoworld", "%SYSTEM-F-NOWORLD, metro world not attached\n",
                                     "%SYSTEM-F-NOWORLD, monde métro non attaché\n")
 
-        add("valcp.rame.title",     "\nRame %@ status at %@\n\n",          "\nÉtat de la rame %@ à %@\n\n")
+        add("valcp.rame.title",     "\nTrain %@ status at %@\n\n",         "\nÉtat de la rame %@ à %@\n\n")
         add("valcp.rame.position",  "  Position:        ",                 "  Position :        ")
         add("valcp.rame.speed",     "  Speed:           ",                 "  Vitesse :         ")
-        add("valcp.rame.consigne",  "consigne",                            "consigne")
+        add("valcp.rame.consigne",  "setpoint",                            "consigne")
         add("valcp.rame.ma",        "  Movement auth.:  ",                 "  Autor. mouvement: ")
         add("valcp.rame.direction", "  Direction:       ",                 "  Sens :            ")
         add("valcp.rame.status",    "  Status:          ",                 "  État :            ")
         add("valcp.rame.mode",      "  Mode:            ",                 "  Mode :            ")
         add("valcp.rame.doors",     "  Doors:           ",                 "  Portes :          ")
+        add("valcp.rame.owner",     "  Owner:           ",                 "  Pilotage :        ")
+        add("valcp.owner.local",    "THIS NODE",                           "CE NŒUD")
+        add("valcp.owner.remote",   "REMOTE NODE",                         "NŒUD DISTANT")
         add("valcp.rame.pax",       "  Passengers:      %d / %d",          "  Voyageurs :       %d / %d")
         add("valcp.rame.nextstop",  "  Next stop:       ",                 "  Prochain arrêt :  ")
         add("valcp.rame.voltage",   "  Line voltage:  ",                   "  Tension ligne : ")
@@ -349,46 +462,55 @@ enum Strings {
         add("valcp.dir.reverse",    "REVERSE",                             "SENS INVERSE")
         add("valcp.status.stopped", "STOPPED",                             "ARRÊT")
         add("valcp.status.moving",  "MOVING",                              "EN MARCHE")
-        add("valcp.status.emergency","EMERGENCY (FU)",                     "URGENCE (FU)")
+        add("valcp.status.emergency","EMERGENCY (EB)",                     "URGENCE (FU)")
         add("valcp.status.docked",  "AT PLATFORM",                         "À QUAI")
-        add("valcp.mode.auto",      "AUTOMATIC (CAI)",                     "CONDUITE AUTOMATIQUE (CAI)")
-        add("valcp.mode.manual",    "MANUAL (CML)",                        "CONDUITE MANUELLE (CML)")
+        add("valcp.mode.auto",      "AUTOMATIC OPERATION (ATO)",           "CONDUITE AUTOMATIQUE (CAI)")
+        add("valcp.mode.manual",    "MANUAL DRIVING (MAN)",                "CONDUITE MANUELLE (CML)")
         add("valcp.door.open",      "OPEN",                                "OUVERTES")
         add("valcp.door.closed",    "CLOSED AND LOCKED",                   "FERMÉES ET VERROUILLÉES")
 
         add("valcp.fleet.title",    "Fleet status at %@",                  "État du parc à %@")
-        add("valcp.fleet.header",   "    Rame  Position   Canton      Speed        MA  Mode  Status  Drs   Pax\n",
-                                    "    Rame  Position   Canton    Vitesse        AM  Mode  État    Prt   Voy\n")
-        add("valcp.fleet.sep",      "    ----  --------  --------   ------   -------  ----  ------  ---  ----\n",
-                                    "    ----  --------  --------   ------   -------  ----  ------  ---  ----\n")
-        add("valcp.fleet.none",     "    (no rames in service)\n",         "    (aucune rame en service)\n")
+        add("valcp.fleet.header",   "    Train O Position   Block       Speed        MA  Mode  Status  Drs   Pax\n",
+                                    "    Rame  P Position   Canton    Vitesse        AM  Mode  État    Prt   Voy\n")
+        add("valcp.fleet.sep",      "    ----- - --------  --------   ------   -------  ----  ------  ---  ----\n",
+                                    "    ----- - --------  --------   ------   -------  ----  ------  ---  ----\n")
+        add("valcp.fleet.none",     "    (no trains in service)\n",        "    (aucune rame en service)\n")
+        add("valcp.fleet.mode.auto","ATO ",                                "CAI ")
+        add("valcp.fleet.mode.manual","MAN ",                              "CML ")
+        add("valcp.fleet.status.stopped","STOP  ",                         "ARRÊT ")
+        add("valcp.fleet.status.moving","RUN   ",                          "MARCHE")
+        add("valcp.fleet.status.emergency","EB    ",                       "FU    ")
+        add("valcp.fleet.status.docked","DWELL ",                          "À QUAI")
+        add("valcp.fleet.doors.open","OPN",                                "OUV")
+        add("valcp.fleet.doors.closed","CLS",                              "FER")
 
-        add("valcp.ligne.title",    "\nLine 1 exploitation at %@\n\n",     "\nExploitation ligne 1 à %@\n\n")
+        add("valcp.ligne.title",    "\nLine 1 operations at %@\n\n",       "\nExploitation ligne 1 à %@\n\n")
         add("valcp.ligne.mode",     "  Mode:            ",                 "  Mode :            ")
         add("valcp.ligne.mode.stopped","SERVICE STOPPED",                  "SERVICE ARRÊTÉ")
-        add("valcp.ligne.mode.normal","NORMAL -- conduite automatique intégrale",
-                                    "NORMAL -- conduite automatique intégrale")
-        add("valcp.ligne.mode.sp",  "SERVICE PROVISOIRE",                  "SERVICE PROVISOIRE")
+        add("valcp.ligne.mode.normal","NORMAL -- full automatic operation (ATO)",
+                                    "NORMAL -- conduite automatique intégrale (CAI)")
+        add("valcp.ligne.mode.sp",  "TEMPORARY SERVICE (SP)",              "SERVICE PROVISOIRE")
         add("valcp.ligne.mode.emergency","GENERAL EMERGENCY STOP",         "ARRÊT D'URGENCE GÉNÉRAL")
-        add("valcp.ligne.spdetail", "  SP section:      %@ <-> %@  (headway %d s)",
+        add("valcp.ligne.spdetail", "  Temp service:    %@ <-> %@  (headway %d s)",
                                     "  Section SP :      %@ <-> %@  (intervalle %d s)")
         add("valcp.ligne.geometry", "  Track:           %d cantons, %d m loop",
                                     "  Voie :            %d cantons, boucle de %d m")
-        add("valcp.ligne.rames",    "  Rames:           %d in service (max %d)\n",
-                                    "  Rames :           %d en service (max %d)\n")
-        add("valcp.ligne.modenormal","%VALCP-S-NORMAL, line returned to normal exploitation\n",
+        add("valcp.ligne.rames",    "  Local trains:    %d in service (max %d)\n",
+                                    "  Rames locales :   %d en service (max %d)\n")
+        add("valcp.ligne.remote",   "  Remote trains:   %d\n",             "  Rames distantes : %d\n")
+        add("valcp.ligne.modenormal","%VALCP-S-NORMAL, line returned to normal operation\n",
                                     "%VALCP-S-NORMAL, ligne rendue à l'exploitation normale\n")
         add("valcp.ligne.serviceon","%VALCP-S-SERVICE, line service started\n",
                                     "%VALCP-S-SERVICE, service de ligne démarré\n")
-        add("valcp.ligne.serviceoff","%VALCP-S-SERVICE, line service stopped -- rames braking to a stand\n",
+        add("valcp.ligne.serviceoff","%VALCP-S-SERVICE, line service stopped -- trains braking to a stand\n",
                                     "%VALCP-S-SERVICE, service arrêté -- rames en cours d'immobilisation\n")
-        add("valcp.ligne.emeron",   "%VALCP-S-EMERGENCY, general emergency stop -- FU on every rame\n",
+        add("valcp.ligne.emeron",   "%VALCP-S-EMERGENCY, general emergency stop -- emergency brake on every train\n",
                                     "%VALCP-S-EMERGENCY, arrêt d'urgence général -- FU sur toutes les rames\n")
         add("valcp.ligne.emeroff",  "%VALCP-S-EMERGENCY, emergency stop released\n",
                                     "%VALCP-S-EMERGENCY, arrêt d'urgence levé\n")
-        add("valcp.ligne.spon",     "%%VALCP-S-SP, service provisoire engaged %@ <-> %@ (headway %d s)\n",
+        add("valcp.ligne.spon",     "%%VALCP-S-SP, temporary service engaged %@ <-> %@ (headway %d s)\n",
                                     "%%VALCP-S-SP, service provisoire engagé %@ <-> %@ (intervalle %d s)\n")
-        add("valcp.ligne.spoff",    "%VALCP-S-SP, service provisoire cleared -- full line restored\n",
+        add("valcp.ligne.spoff",    "%VALCP-S-SP, temporary service cleared -- full line restored\n",
                                     "%VALCP-S-SP, service provisoire levé -- ligne complète rétablie\n")
         add("valcp.ligne.spusage",  "%VALCP-W-IVSP, usage: SET LIGNE /SP=(from,to[,interval-s]) with station ids 1..6\n",
                                     "%VALCP-W-IVSP, usage : SET LIGNE /SP=(de,à[,intervalle-s]) avec des ids de station 1..6\n")
@@ -396,20 +518,20 @@ enum Strings {
                                     "%VALCP-W-MISSQUAL, attendu /SERVICE=, /EMERGENCY=, /SP= ou /NORMAL\n")
 
         add("valcp.stations.title", "Stations of line 1 at %@",            "Stations de la ligne 1 à %@")
-        add("valcp.stations.header","     #  Station                 Position    Next rame\n",
+        add("valcp.stations.header","     #  Station                 Position    Next train\n",
                                     "     #  Station                 Position    Prochaine rame\n")
         add("valcp.stations.sep",   "    --  ----------------------  ---------   --------------------\n",
                                     "    --  ----------------------  ---------   --------------------\n")
-        add("valcp.stations.approach","rame %@ at %.0f m",                 "rame %@ à %.0f m")
-        add("valcp.stations.barred","(barred by SP)",                      "(neutralisée par SP)")
-        add("valcp.stations.none",  "(no rames)",                          "(aucune rame)")
+        add("valcp.stations.approach","train %@ at %.0f m",               "rame %@ à %.0f m")
+        add("valcp.stations.barred","(barred by temp service)",            "(neutralisée par le SP)")
+        add("valcp.stations.none",  "(no trains)",                         "(aucune rame)")
 
         add("valcp.pax.title",      "\nPassenger load at %@\n\n",          "\nCharge voyageurs à %@\n\n")
-        add("valcp.pax.header",     "    Rame   Pax   Capacity   Load     State\n",
+        add("valcp.pax.header",     "    Train  Pax   Capacity   Load     State\n",
                                     "    Rame   Voy   Capacité   Charge   État\n")
         add("valcp.pax.sep",        "    ----   ---   --------   ------   -----\n",
                                     "    ----   ---   --------   ------   -----\n")
-        add("valcp.pax.none",       "    (no rames in service)\n",         "    (aucune rame en service)\n")
+        add("valcp.pax.none",       "    (no trains in service)\n",        "    (aucune rame en service)\n")
         add("valcp.pax.state.crush","CRUSH LOAD",                          "SURCHARGE")
         add("valcp.pax.state.full", "FULL",                                "COMPLET")
         add("valcp.pax.state.empty","EMPTY",                               "VIDE")
@@ -417,41 +539,47 @@ enum Strings {
 
         add("valcp.rame.missrame",  "%SET-W-MISSPARM, usage: SET RAME <label> /qualifier\n",
                                     "%SET-W-MISSPARM, usage : SET RAME <label> /qualificatif\n")
-        add("valcp.rame.nosuch",    "%%SET-W-NOSUCHRAME, no such rame \\%@\\\n",
+        add("valcp.rame.nosuch",    "%%SET-W-NOSUCHRAME, no such train \\%@\\\n",
                                     "%%SET-W-NOSUCHRAME, rame inconnue \\%@\\\n")
-        add("valcp.rame.man.set",   "%%SET-S-MODE, rame %@ now in manual driving (CML)\n",
+        add("valcp.rame.man.set",   "%%SET-S-MODE, train %@ now in manual driving (MAN)\n",
                                     "%%SET-S-MODE, rame %@ passée en conduite manuelle (CML)\n")
-        add("valcp.rame.man.nochg", "%%SET-I-NOCHG, rame %@ already in manual driving\n",
+        add("valcp.rame.man.nochg", "%%SET-I-NOCHG, train %@ already in manual driving\n",
                                     "%%SET-I-NOCHG, rame %@ déjà en conduite manuelle\n")
-        add("valcp.rame.auto.set",  "%%SET-S-MODE, rame %@ returned to automatic pilot (CAI)\n",
+        add("valcp.rame.auto.set",  "%%SET-S-MODE, train %@ returned to automatic operation (ATO)\n",
                                     "%%SET-S-MODE, rame %@ rendue au pilotage automatique (CAI)\n")
-        add("valcp.rame.auto.nochg","%%SET-I-NOCHG, rame %@ already in automatic pilot\n",
+        add("valcp.rame.auto.nochg","%%SET-I-NOCHG, train %@ already in automatic operation\n",
                                     "%%SET-I-NOCHG, rame %@ déjà en pilotage automatique\n")
-        add("valcp.rame.speed.set", "%%SET-S-SPEED, rame %@ manual speed setpoint %.1f m/s\n",
+        add("valcp.rame.speed.set", "%%SET-S-SPEED, train %@ manual speed setpoint %.1f m/s\n",
                                     "%%SET-S-SPEED, consigne manuelle de la rame %@ : %.1f m/s\n")
-        add("valcp.rame.speed.notmanual","%%SET-W-NOTMANUAL, rame %@ is in automatic pilot -- SET RAME /MANUAL first\n",
+        add("valcp.rame.speed.notmanual","%%SET-W-NOTMANUAL, train %@ is in automatic operation -- SET RAME /MANUAL first\n",
                                     "%%SET-W-NOTMANUAL, la rame %@ est en pilotage automatique -- SET RAME /MANUAL d'abord\n")
-        add("valcp.rame.fu.on",     "%%SET-S-FU, rame %@ FU commanded\n",
+        add("valcp.rame.fu.on",     "%%SET-S-FU, emergency brake commanded on train %@\n",
                                     "%%SET-S-FU, FU commandé sur la rame %@\n")
-        add("valcp.rame.fu.off",    "%%SET-S-FU, rame %@ FU released\n",
+        add("valcp.rame.fu.off",    "%%SET-S-FU, emergency brake released on train %@\n",
                                     "%%SET-S-FU, FU relâché sur la rame %@\n")
-        add("valcp.rame.fault.portes","%%SET-S-FAULT, rame %@ door fault %@\n",
+        add("valcp.rame.forwarded", "%%SET-S-FORWARD, request sent to train %@'s owner node\n",
+                                    "%%SET-S-FORWARD, demande transmise au nœud pilote de la rame %@\n")
+        add("valcp.rame.nolink",    "%%SET-W-NOLINK, train %@ is remote and its owner is unreachable\n",
+                                    "%%SET-W-NOLINK, la rame %@ est distante et son nœud pilote est injoignable\n")
+        add("valcp.rame.owneronly", "%%SET-W-OWNERONLY, faults and tires on train %@ are managed by its owner node\n",
+                                    "%%SET-W-OWNERONLY, les défauts et pneus de la rame %@ sont gérés par son nœud pilote\n")
+        add("valcp.rame.fault.portes","%%SET-S-FAULT, train %@ door fault %@\n",
                                     "%%SET-S-FAULT, défaut portes rame %@ %@\n")
-        add("valcp.rame.fault.traction","%%SET-S-FAULT, rame %@ traction fault %@\n",
+        add("valcp.rame.fault.traction","%%SET-S-FAULT, train %@ traction fault %@\n",
                                     "%%SET-S-FAULT, défaut traction rame %@ %@\n")
-        add("valcp.rame.fault.frein","%%SET-S-FAULT, rame %@ brake fault %@\n",
+        add("valcp.rame.fault.frein","%%SET-S-FAULT, train %@ brake fault %@\n",
                                     "%%SET-S-FAULT, défaut frein rame %@ %@\n")
-        add("valcp.rame.fault.ctc", "%%SET-S-FAULT, rame %@ CTC radio fault %@\n",
+        add("valcp.rame.fault.ctc", "%%SET-S-FAULT, train %@ CTC radio fault %@\n",
                                     "%%SET-S-FAULT, défaut radio CTC rame %@ %@\n")
-        add("valcp.rame.fault.patinage","%%SET-S-FAULT, rame %@ wheel slip (patinage) %@\n",
+        add("valcp.rame.fault.patinage","%%SET-S-FAULT, train %@ wheel slip %@\n",
                                     "%%SET-S-FAULT, patinage rame %@ %@\n")
-        add("valcp.rame.fault.enrayage","%%SET-S-FAULT, rame %@ wheel slide (enrayage) %@\n",
+        add("valcp.rame.fault.enrayage","%%SET-S-FAULT, train %@ wheel slide %@\n",
                                     "%%SET-S-FAULT, enrayage rame %@ %@\n")
         add("valcp.rame.fault.set", "latched",                             "activé")
         add("valcp.rame.fault.cleared","cleared",                          "levé")
         add("valcp.rame.pneu.range","%%SET-W-IVPNEU, tire index must be 1..%d\n",
                                     "%%SET-W-IVPNEU, l'index du pneu doit être 1..%d\n")
-        add("valcp.rame.pneu.cycled","%%SET-S-PNEU, rame %@ tire %d now %@\n",
+        add("valcp.rame.pneu.cycled","%%SET-S-PNEU, train %@ tire %d now %@\n",
                                     "%%SET-S-PNEU, pneu %2$d de la rame %1$@ : %3$@\n")
         add("valcp.rame.missqual",  "%SET-W-MISSQUAL, expected /MANUAL /AUTOMATIC /SPEED= /FU= /PORTES= /TRACTION= /FREIN= /CTC= /PATINAGE= /ENRAYAGE= or /PNEU=\n",
                                     "%SET-W-MISSQUAL, attendu /MANUAL /AUTOMATIC /SPEED= /FU= /PORTES= /TRACTION= /FREIN= /CTC= /PATINAGE= /ENRAYAGE= ou /PNEU=\n")
@@ -464,7 +592,7 @@ enum Strings {
                                     "Flèches : choisir · ENTRÉE : lancer · CTRL/Y : quitter")
         add("diag.operator",        "Operator",                            "Opérateur")
         add("diag.elapsed",         "Elapsed:",                            "Écoulé :")
-        add("diag.col.rame",        "Rame  Test",                          "Rame  Test")
+        add("diag.col.rame",        "Train  Test",                         "Rame  Test")
         add("diag.col.station",     "Station  Test",                       "Station  Test")
         add("diag.col.reading",     "Reading",                             "Mesure")
         add("diag.col.status",      "Status",                              "État")
@@ -483,16 +611,16 @@ enum Strings {
         add("diag.test.portes",     "PORTES_TEST -- door cycle + interlock","PORTES_TEST -- cycle portes + asservissement")
         add("diag.test.pneu",       "PNEU_CAL -- tire-pressure calibration","PNEU_CAL -- calibration pression pneus")
         add("diag.test.quai",       "QUAI_LAMP_TEST -- platform lamp test", "QUAI_LAMP_TEST -- test lampes de quai")
-        add("diag.step.frein.rame", "Rame %@   brake chain",               "Rame %@   chaîne de freinage")
+        add("diag.step.frein.rame", "Train %@   brake chain",              "Rame %@   chaîne de freinage")
         add("diag.step.frein.fw",   "Brake controller firmware",           "Micrologiciel du contrôleur de frein")
-        add("diag.step.portes.cycle","Rame %@   door cycle",               "Rame %@   cycle des portes")
-        add("diag.step.portes.interlock","Rame %@   traction interlock",   "Rame %@   asservissement traction")
-        add("diag.step.pneu.read",  "Rame %@   pressure sweep",            "Rame %@   relevé des pressions")
-        add("diag.step.pneu.span",  "Rame %@   span vs nominal",           "Rame %@   écart au nominal")
+        add("diag.step.portes.cycle","Train %@   door cycle",              "Rame %@   cycle des portes")
+        add("diag.step.portes.interlock","Train %@   traction interlock",  "Rame %@   asservissement traction")
+        add("diag.step.pneu.read",  "Train %@   pressure sweep",           "Rame %@   relevé des pressions")
+        add("diag.step.pneu.span",  "Train %@   span vs nominal",          "Rame %@   écart au nominal")
         add("diag.step.pneu.write", "Write calibration records",           "Écriture des enregistrements")
         add("diag.step.quai.station","%@   lamps + display",               "%@   lampes + afficheur")
         add("diag.step.quai.fw",    "Platform display firmware",           "Micrologiciel des afficheurs")
-        add("diag.frein.reading.dragging","FU while moving",               "FU en mouvement")
+        add("diag.frein.reading.dragging","EB while moving",               "FU en mouvement")
         add("diag.frein.reading.released","released (moving)",             "desserré (en mvt)")
         add("diag.frein.reading.holding","%.1f kN holding",                "%.1f kN de retenue")
         add("diag.portes.reading.movingSuffix"," (in motion)",             " (en mouvement)")
@@ -500,7 +628,7 @@ enum Strings {
         add("diag.portes.reading.violated","INTERLOCK OPEN",               "CHAÎNE OUVERTE")
         add("diag.pneu.reading.records","%d records",                      "%d entrées")
         add("diag.quai.reading.lit","lamps + display lit",                 "lampes + afficheur allumés")
-        add("diag.reading.noRame",  "(no rame)",                           "(aucune rame)")
+        add("diag.reading.noRame",  "(no train)",                          "(aucune rame)")
         add("diag.reading.noWorld", "(no world)",                          "(aucun monde)")
 
         return t

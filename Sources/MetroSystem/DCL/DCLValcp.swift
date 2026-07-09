@@ -97,18 +97,19 @@ extension DCLEngine {
         }
         let modeKey = t.mode == .auto ? "valcp.mode.auto" : "valcp.mode.manual"
         let doorKey = t.doorsOpen ? "valcp.door.open" : "valcp.door.closed"
-        let cantonName = world.canton(at: t.position)?.name ?? "--"
+        let cantonName = world.canton(at: t.position).map { blockName($0.id) } ?? "--"
         let dirKey = t.travelDirection == .forward ? "valcp.dir.forward" : "valcp.dir.reverse"
 
         var faults: [String] = []
-        if t.isDoorFault   { faults.append("PORTES") }
-        if t.isEngineFault { faults.append("TRACTION") }
-        if t.isBrakeFault  { faults.append("FREIN") }
-        if t.isSignalFault { faults.append("CTC_RADIO") }
-        if t.isPatinage    { faults.append("PATINAGE") }
-        if t.isEnrayage    { faults.append("ENRAYAGE") }
-        if t.isEmergencyBrakeApplied { faults.append("FU") }
+        if t.isDoorFault   { faults.append(tr("fault.portes")) }
+        if t.isEngineFault { faults.append(tr("fault.traction")) }
+        if t.isBrakeFault  { faults.append(tr("fault.frein")) }
+        if t.isSignalFault { faults.append(tr("fault.ctc")) }
+        if t.isPatinage    { faults.append(tr("fault.patinage")) }
+        if t.isEnrayage    { faults.append(tr("fault.enrayage")) }
+        if t.isEmergencyBrakeApplied { faults.append(tr("btn.fu")) }
         let faultStr = faults.isEmpty ? tr("valcp.rame.nofault") : faults.joined(separator: ", ")
+        let ownerKey = world.canControl(t) ? "valcp.owner.local" : "valcp.owner.remote"
 
         var s = String(format: tr("valcp.rame.title"), t.label, stamp(Date()))
         s += String(format: "%@%8.1f m   (%@)\n", tr("valcp.rame.position"), t.position, cantonName)
@@ -119,6 +120,7 @@ extension DCLEngine {
         s += tr("valcp.rame.status")    + tr(statusKey) + "\n"
         s += tr("valcp.rame.mode")      + tr(modeKey) + "\n"
         s += tr("valcp.rame.doors")     + tr(doorKey) + "\n"
+        s += tr("valcp.rame.owner")     + tr(ownerKey) + "\n"
         s += String(format: tr("valcp.rame.pax") + "\n", t.passengerCount, Sim.paxCapacity)
         s += tr("valcp.rame.nextstop")  + t.nextStationName + "\n"
         s += String(format: "%@%6.0f V   %@%7.0f A\n", tr("valcp.rame.voltage"), t.mainVoltage,
@@ -127,14 +129,15 @@ extension DCLEngine {
         // Tire block: eight positions, VMS-table style.
         s += tr("valcp.rame.tires")
         for tire in t.tires {
-            s += String(format: "\n      %2d   %4.1f bar   %@", tire.id, tire.pressure, tire.status.rawValue)
+            s += String(format: "\n      %2d   %4.1f bar   %@", tire.id, tire.pressure, tireStatusName(tire.status))
         }
         s += "\n"
         return s
     }
 
     /// Fleet summary table shared by VALCP SHOW RAME (no label) and
-    /// SHOW RAMES.
+    /// SHOW RAMES. The Own column marks each rame L (this node) or R
+    /// (peer-owned).
     func showFleet() -> String {
         guard let world else { return "%SHOW-W-NOWORLD, metro world not attached\n" }
         var s = "\n" + String(format: tr("valcp.fleet.title"), stamp(Date())) + "\n"
@@ -146,18 +149,20 @@ extension DCLEngine {
             return s
         }
         for t in trains {
-            let canton = world.canton(at: t.position)?.name ?? "--"
-            let mode = t.mode == .auto ? "CAI " : "CML "
+            let canton = world.canton(at: t.position).map { blockName($0.id) } ?? "--"
+            let mode = t.mode == .auto ? tr("valcp.fleet.mode.auto") : tr("valcp.fleet.mode.manual")
             let status: String
             switch t.status {
-            case .stopped:   status = "ARRET "
-            case .moving:    status = "MARCHE"
-            case .emergency: status = "FU    "
-            case .docked:    status = "A QUAI"
+            case .stopped:   status = tr("valcp.fleet.status.stopped")
+            case .moving:    status = tr("valcp.fleet.status.moving")
+            case .emergency: status = tr("valcp.fleet.status.emergency")
+            case .docked:    status = tr("valcp.fleet.status.docked")
             }
-            let doors = t.doorsOpen ? "OUV" : "FER"
-            s += String(format: "    %-5@ %8.1f  %-10@ %6.2f  %8.1f  %@  %@  %@  %4d\n",
+            let doors = t.doorsOpen ? tr("valcp.fleet.doors.open") : tr("valcp.fleet.doors.closed")
+            let own = world.canControl(t) ? "L" : "R"
+            s += String(format: "    %-5@ %@ %8.1f  %-10@ %6.2f  %8.1f  %@  %@  %@  %4d\n",
                         t.label as NSString,
+                        own,
                         t.position,
                         canton as NSString,
                         t.speed,
@@ -187,7 +192,8 @@ extension DCLEngine {
                         Int(sp.intervalle))
         }
         s += String(format: tr("valcp.ligne.geometry") + "\n", Sim.cantonCount, Int(Sim.trackLength))
-        s += String(format: tr("valcp.ligne.rames"), world.trains.count, Sim.maxTrainCount)
+        s += String(format: tr("valcp.ligne.rames"), world.locallyOwned().count, Sim.maxTrainCount)
+        s += String(format: tr("valcp.ligne.remote"), world.trains.count - world.locallyOwned().count)
         return s
     }
 
@@ -249,6 +255,11 @@ extension DCLEngine {
                         t.label as NSString, t.passengerCount, Sim.paxCapacity, pct, tr(stateKey))
         }
         return s
+    }
+
+    /// Localized track-block name ("Block 3" / "Canton 3").
+    func blockName(_ id: Int) -> String {
+        String(format: tr("block.name"), id)
     }
 
     private func valcpSynopsis() -> String {

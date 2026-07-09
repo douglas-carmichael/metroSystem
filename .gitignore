@@ -12,3 +12,6 @@ DerivedData/
 
 # Mac
 .DS_Store
+
+# ClusterDaemon SwiftPM build products
+ClusterDaemon/.build/

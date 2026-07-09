@@ -1,0 +1,29 @@
+name: ClusterDaemon
+
+# Builds the headless metro-clusterd SwiftPM package and runs its wire-codec
+# self-test, which locks the peer-protocol wire compatibility with the app
+# (the app decodes the daemon's bytes and vice versa).
+
+on:
+  push:
+    branches: [main]
+    paths: ['ClusterDaemon/**', '.github/workflows/clusterdaemon.yml']
+  pull_request:
+    branches: [main]
+    paths: ['ClusterDaemon/**', '.github/workflows/clusterdaemon.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: ClusterDaemon
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: swift build
+
+      - name: Wire codec self-test
+        run: swift run metro-clusterd --selftest

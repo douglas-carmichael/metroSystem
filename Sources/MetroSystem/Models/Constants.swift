@@ -42,6 +42,12 @@ enum Sim {
     static let tickHz: Double = 60.0
     static var tickInterval: Double { 1.0 / tickHz }
 
+    // Peer networking (app <-> app, app <-> ClusterDaemon nodes).
+    static let bonjourServiceType: String = "_metrosys._tcp"
+    /// Periodic rebroadcast cadence for locally-owned rame state. Operator
+    /// actions additionally push a `.state` immediately via onLocalChange.
+    static let peerStateBroadcastHz: Double = 10.0
+
     /// The six stations of the simulated line (Lille VAL Ligne 1 flavour),
     /// as (name, position-in-metres) pairs along the loop.
     static let stationLayout: [(name: String, position: Double)] = [

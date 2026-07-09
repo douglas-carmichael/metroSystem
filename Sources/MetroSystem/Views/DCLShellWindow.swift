@@ -11,6 +11,7 @@ struct DCLShellWindow: View {
     // browse state). The shared world / language objects come from the
     // environment and are wired in via attach().
     @EnvironmentObject var world: MetroWorld
+    @EnvironmentObject var network: PeerNetwork
     @EnvironmentObject var language: AppLanguage
     @EnvironmentObject var sessions: DCLSessionCoordinator
     @StateObject private var dcl = DCLEngine()
@@ -31,13 +32,14 @@ struct DCLShellWindow: View {
             // banner line, the `$ ` prompt after CLEAR) gets hidden
             // behind the chrome.
             .background(WindowAccessor { hostWindow = $0 })
+            .navigationTitle(language.t("window.dcl"))
             .onAppear {
                 // Attach exactly once per window. onAppear can re-fire (e.g.
                 // when the window is re-shown), and attach() repaints the
                 // whole login block, so guard against a second run.
                 guard !didAttach else { return }
                 didAttach = true
-                dcl.attach(world: world, language: language)
+                dcl.attach(world: world, network: network, language: language)
                 // Join the session set so exactly one live terminal owns the
                 // in-universe status-mail generator (see DCLSessionCoordinator).
                 sessions.register(dcl)

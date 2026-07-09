@@ -498,10 +498,22 @@ extension DCLEngine {
              String(format: "%.2f", lock)]
         }
 
-        // Single-node "cluster": the PCC host, pulled from HostStats.
+        // Local node: pulled from HostStats directly.
         let local = host.snapshot()
         s += clusterRow(nodeName, statCells(local.cpuBusy, local.bufferedIORate,
                                             local.directIORate, local.memUsedPercent, local.lockRate))
+        // Remote nodes: snapshots that peers broadcast every 5 s.
+        let snapshots = network?.peerStats ?? [:]
+        for peer in network?.peers ?? [] {
+            let nm = String(peer.displayName.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(8))
+            if let snap = snapshots[peer.id] {
+                s += clusterRow(nm, statCells(snap.cpuBusy, snap.bufferedIORate,
+                                              snap.directIORate, snap.memUsedPercent, snap.lockRate))
+            } else {
+                // Connected but no snapshot has arrived yet (under 5 s old).
+                s += clusterRow(nm, Array(repeating: "--", count: colW.count))
+            }
+        }
         return s
     }
 
@@ -550,13 +562,13 @@ extension DCLEngine {
     /// state column tells you which regime the speed controller is in.
     func monitorDynamics() -> String {
         let now = Date()
-        var s = mheader("RAME DYNAMICS (LPD)")
-        s += "  Rame    Position     Speed / Consigne     Accel        MA      State\n"
-        s += "  ----    --------     ----------------     ------    -------   -----\n"
+        var s = mheader("TRAIN DYNAMICS (LPD)")
+        s += "  Train   Position     Speed / Setpoint     Accel        MA      State\n"
+        s += "  -----   --------     ----------------     ------    -------   -----\n"
 
         let trains = world?.sortedTrains ?? []
         if trains.isEmpty {
-            s += "  (no rames in service)\n"
+            s += "  (no trains in service)\n"
             return s
         }
         let dt = max(0.001, now.timeIntervalSince(lastDynamicsSampleAt))
@@ -577,16 +589,19 @@ extension DCLEngine {
         lastDynamicsSampleAt = now
 
         s += "\n"
-        s += String(format: "  Profile limits:  V %.1f m/s   accel %.2f m/s²   service %.2f   FU %.2f m/s²\n",
+        s += String(format: "  Profile limits:  V %.1f m/s   accel %.2f m/s²   service brake %.2f   emerg brake %.2f m/s²\n",
                     Sim.lineSpeed, Sim.maxAcceleration, Sim.nominalBraking, Sim.emergencyBraking)
         return s
     }
 
+    /// Firmware-side English state mnemonics -- MONITOR is in-universe VMS
+    /// system output, so these do not localize (the Dynamics window shows
+    /// the same regimes localized).
     private func dynamicsState(for train: Train) -> String {
-        if train.isEmergencyBrakeApplied || train.status == .emergency { return "FU" }
-        if train.doorsOpen { return "A QUAI" }
+        if train.isEmergencyBrakeApplied || train.status == .emergency { return "EB" }
+        if train.doorsOpen { return "DWELL" }
         if train.isDepartureHold { return "HOLD" }
-        if train.mode == .manual { return "CML" }
+        if train.mode == .manual { return "MANUAL" }
         if train.status == .stopped { return abs(train.speed) > 0.05 ? "STOPPING" : "IDLE" }
         let cruising = train.speed >= train.consigneVitesse * 0.95 && train.consigneVitesse > 0.5
         if train.speedError < -0.3 { return "DECEL" }

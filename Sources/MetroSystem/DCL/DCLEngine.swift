@@ -69,6 +69,7 @@ final class DCLEngine: ObservableObject {
     var diagInvokedFromMenu: Bool = false
 
     weak var world: MetroWorld?
+    weak var network: PeerNetwork?
     weak var language: AppLanguage?
 
     let host = HostStats.shared
@@ -335,8 +336,10 @@ final class DCLEngine: ObservableObject {
         return name
     }
 
-    func attach(world: MetroWorld, language: AppLanguage? = nil) {
+    func attach(world: MetroWorld, network: PeerNetwork? = nil,
+                language: AppLanguage? = nil) {
         self.world = world
+        self.network = network
         self.language = language
         // In-universe status mail (OPCOM / SCADA notices) is NOT started
         // here: with several sessions attached to the same world, each would
