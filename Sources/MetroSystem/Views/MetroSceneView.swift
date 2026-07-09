@@ -223,10 +223,19 @@ struct MetroSceneRepresentable: NSViewRepresentable {
         /// smooth-reading 40-gon.
         private let chordsPerCanton = 4
 
-        struct TrainNodes {
+        final class TrainNodes {
             let root: SCNNode
             let body: SCNNode
             let label: SCNNode
+            let doorLeft: SCNNode
+            let doorRight: SCNNode
+            var lastDoorsOpen = false
+            var paxTick = 0
+            init(root: SCNNode, body: SCNNode, label: SCNNode,
+                 doorLeft: SCNNode, doorRight: SCNNode) {
+                self.root = root; self.body = body; self.label = label
+                self.doorLeft = doorLeft; self.doorRight = doorRight
+            }
         }
 
         init(world: MetroWorld, cantonShort: String) {
@@ -498,7 +507,27 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             label.position = SCNVector3(0, 14, 0)
             root.addChildNode(label)
 
-            return TrainNodes(root: root, body: body, label: label)
+            // Passenger doors on the platform-facing (+x / outward) side: a
+            // dark recessed doorway with two sliding leaves that part when the
+            // doors open. Local +x is radially outward, toward the platform.
+            let doorway = SCNNode(geometry: SCNBox(width: 0.2, height: 4.4, length: 7.4, chamferRadius: 0))
+            doorway.geometry?.firstMaterial?.diffuse.contents = NSColor(white: 0.02, alpha: 1)
+            doorway.geometry?.firstMaterial?.lightingModel = .constant
+            doorway.position = SCNVector3(3.05, 3, 0)
+            body.addChildNode(doorway)
+
+            let leaf = SCNBox(width: 0.5, height: 4.4, length: 3.5, chamferRadius: 0.1)
+            leaf.firstMaterial?.diffuse.contents = NSColor(white: 0.72, alpha: 1)
+            leaf.firstMaterial?.emission.contents = NSColor(white: 0.16, alpha: 1)
+            let doorLeft = SCNNode(geometry: leaf)
+            doorLeft.position = SCNVector3(3.25, 3, -1.8)
+            body.addChildNode(doorLeft)
+            let doorRight = SCNNode(geometry: leaf)
+            doorRight.position = SCNVector3(3.25, 3, 1.8)
+            body.addChildNode(doorRight)
+
+            return TrainNodes(root: root, body: body, label: label,
+                              doorLeft: doorLeft, doorRight: doorRight)
         }
 
         private func updateTrain(nodes: TrainNodes, train: Train) {
@@ -522,6 +551,53 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             nodes.body.geometry?.firstMaterial?.diffuse.contents = color
             nodes.body.geometry?.firstMaterial?.emission.contents =
                 color.withAlphaComponent(0.45)
+
+            // Slide the doors on an open/close edge.
+            if train.doorsOpen != nodes.lastDoorsOpen {
+                nodes.lastDoorsOpen = train.doorsOpen
+                let z: CGFloat = train.doorsOpen ? 5.3 : 1.8
+                nodes.doorLeft.runAction(.move(to: SCNVector3(3.25, 3, -z), duration: 0.6))
+                nodes.doorRight.runAction(.move(to: SCNVector3(3.25, 3, z), duration: 0.6))
+            }
+            // Stream passengers between the platform and the open doors while
+            // the rame is docked, biased by the stop's boarding / alighting mix.
+            if train.doorsOpen && train.status == .docked {
+                nodes.paxTick += 1
+                if nodes.paxTick % 15 == 0 { emitPax(train: train) }
+            } else {
+                nodes.paxTick = 0
+            }
+        }
+
+        /// Spawn one passenger dot for `train`: green boarding (platform →
+        /// door) or cyan alighting (door → platform), chosen in proportion to
+        /// the stop's montée / descente totals. The dot animates once and
+        /// removes itself, so no bookkeeping is needed.
+        private func emitPax(train: Train) {
+            let board = max(0, train.paxBoarding)
+            let alight = max(0, train.paxAlighting)
+            let total = board + alight
+            guard total > 0 else { return }
+            let boarding = Double.random(in: 0..<1) < Double(board) / Double(total)
+
+            let doorPos = point(at: train.position, y: 3, radialScale: (radius + 5) / radius)
+            let platPos = point(at: train.position, y: 2.5, radialScale: 1.13)
+            let start = boarding ? platPos : doorPos
+            let end = boarding ? doorPos : platPos
+
+            let dot = SCNNode(geometry: SCNSphere(radius: 0.55))
+            let c = boarding
+                ? NSColor(deviceRed: 0.36, green: 1.0, blue: 0.42, alpha: 1)
+                : NSColor(deviceRed: 0.45, green: 0.95, blue: 1.0, alpha: 1)
+            dot.geometry?.firstMaterial?.diffuse.contents = c
+            dot.geometry?.firstMaterial?.emission.contents = c
+            dot.geometry?.firstMaterial?.lightingModel = .constant
+            dot.position = start
+            scene.rootNode.addChildNode(dot)
+            dot.runAction(.sequence([
+                .move(to: end, duration: 0.8),
+                .removeFromParentNode()
+            ]))
         }
 
         // MARK: -- billboard text
