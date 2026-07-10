@@ -3,6 +3,10 @@ name: macOS app
 # Builds the XcodeGen-generated MetroSystem app on macOS. The .xcodeproj is
 # .gitignore'd (generated from project.yml), so CI installs XcodeGen, runs
 # `xcodegen generate`, then builds the app scheme.
+#
+# Needs the macos-26 image (Xcode 26.x default): the app targets macOS 15
+# and uses macOS-15+ SwiftUI API, and current XcodeGen (2.45+) emits a
+# project format (objectVersion 77) that Xcode 15 cannot read.
 
 on:
   push:
@@ -13,7 +17,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
