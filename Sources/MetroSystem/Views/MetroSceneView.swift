@@ -7,7 +7,9 @@ import Combine
 /// every canton, station and rame, framed by a VT320-style HUD. The
 /// scene reconciles its nodes against `MetroWorld` on every world tick
 /// (the same coordinator pattern as the DCL windows: SwiftUI owns the
-/// chrome, the Coordinator owns the SceneKit graph).
+/// chrome, the Coordinator owns the SceneKit graph). Both the HUD and
+/// the scene graph follow the active display skin (`ScenePalette`):
+/// phosphor-on-black in retro, the muted ISA-101 canvas under iso101.
 struct MetroSceneWindow: View {
     @EnvironmentObject var world: MetroWorld
     @EnvironmentObject var language: AppLanguage
@@ -37,7 +39,9 @@ struct MetroSceneWindow: View {
             .padding(16)
         }
         .frame(minWidth: 720, minHeight: 560)
-        .background(Color.black)
+        .background(RetroTheme.bg)
+        .id(language.themeKind)
+        .environment(\.colorScheme, language.themeKind == .retro ? .dark : .light)
         .navigationTitle(language.t("window.scene"))
         .onChange(of: world.trains.count) {
             if let id = isolatedTrainId,
@@ -167,6 +171,131 @@ private struct HudOverlay: View {
     }
 }
 
+/// NSColor twins of `RetroTheme` for the SceneKit graph, resolved against
+/// the active skin. Retro keeps the phosphor-on-black look with emissive
+/// glow; iso101 is the ISA-101 high-performance palette — a neutral-grey
+/// canvas, quiet greys / grey-green for normal states, glow off, and
+/// saturated red reserved for alarm states. The window root carries
+/// `.id(themeKind)`, so a skin switch rebuilds the representable (and its
+/// Coordinator, and every baked label texture) wholesale — nothing needs
+/// to re-theme a live scene graph.
+private enum ScenePalette {
+    static var isISO: Bool { RetroTheme.kind == .iso101 }
+
+    // Canvas. The iso101 floor sits a shade darker than the sky so the
+    // horizon still reads; reflections are decorative, so retro-only.
+    static var background: NSColor {
+        isISO ? NSColor(deviceRed: 0.85, green: 0.85, blue: 0.83, alpha: 1) : .black
+    }
+    static var floor: NSColor {
+        isISO ? NSColor(deviceRed: 0.80, green: 0.80, blue: 0.78, alpha: 1)
+              : NSColor(white: 0.03, alpha: 1)
+    }
+    static var floorReflectivity: CGFloat { isISO ? 0 : 0.05 }
+
+    // Lighting: warm phosphor key in retro; flat neutral light under
+    // ISA-101 (form shading only, no colour cast).
+    static var ambientLight: NSColor { NSColor(white: isISO ? 0.70 : 0.35, alpha: 1) }
+    static var keyLight: NSColor {
+        isISO ? NSColor(white: 1.0, alpha: 1)
+              : NSColor(deviceRed: 1.0, green: 0.85, blue: 0.5, alpha: 1)
+    }
+    static var keyLightIntensity: CGFloat { isISO ? 700 : 1400 }
+
+    // Structure (PCC hub) and secondary text (canton numbers).
+    static var structure: NSColor {
+        isISO ? NSColor(deviceRed: 0.18, green: 0.18, blue: 0.20, alpha: 1)
+              : NSColor(deviceRed: 1.0, green: 0.72, blue: 0.20, alpha: 1)
+    }
+    static var structureGlow: NSColor {
+        isISO ? .black : NSColor(deviceRed: 0.5, green: 0.33, blue: 0.06, alpha: 1)
+    }
+    static var dimText: NSColor {
+        isISO ? NSColor(deviceRed: 0.44, green: 0.44, blue: 0.46, alpha: 1)
+              : NSColor(deviceRed: 0.62, green: 0.45, blue: 0.12, alpha: 1)
+    }
+
+    // Track and cantons. Barred SP sections fade toward the canvas in both
+    // skins — down to near-black in retro, up to near-grey under ISA-101 —
+    // so a de-energised section always recedes.
+    static var track: NSColor {
+        isISO ? NSColor(deviceRed: 0.35, green: 0.35, blue: 0.37, alpha: 1)
+              : NSColor(deviceRed: 0.55, green: 0.42, blue: 0.15, alpha: 1)
+    }
+    static var trackGlow: NSColor {
+        isISO ? .black : NSColor(deviceRed: 0.28, green: 0.20, blue: 0.05, alpha: 1)
+    }
+    static var trackBarred: NSColor {
+        isISO ? NSColor(deviceRed: 0.68, green: 0.68, blue: 0.66, alpha: 1)
+              : NSColor(white: 0.14, alpha: 1)
+    }
+    static var trackBarredGlow: NSColor {
+        isISO ? .black : NSColor(white: 0.02, alpha: 1)
+    }
+    static var cantonMarker: NSColor { NSColor(white: isISO ? 0.45 : 0.85, alpha: 1) }
+    static var cantonMarkerGlow: NSColor { isISO ? .black : NSColor(white: 0.35, alpha: 1) }
+
+    // Stations. The label shares the info accent (`accent`) with manual
+    // mode and alighting pax — cyan in retro, the muted ISA-101 blue in iso.
+    static var platform: NSColor {
+        isISO ? NSColor(deviceRed: 0.62, green: 0.62, blue: 0.60, alpha: 1)
+              : NSColor(deviceRed: 0.16, green: 0.16, blue: 0.18, alpha: 1)
+    }
+    static var platformGlow: NSColor {
+        isISO ? .black : NSColor(deviceRed: 0.10, green: 0.07, blue: 0.02, alpha: 1)
+    }
+    static var accent: NSColor {
+        isISO ? NSColor(deviceRed: 0.11, green: 0.33, blue: 0.60, alpha: 1)
+              : NSColor(deviceRed: 0.45, green: 0.95, blue: 1.0, alpha: 1)
+    }
+
+    // Rame body by state. Under ISA-101 the normal states (moving / docked /
+    // idle) are quiet greys and grey-green so the saturated alarm red is the
+    // only loud thing on the canvas; retro keeps the phosphor state coding.
+    static var trainAlarm: NSColor {
+        isISO ? NSColor(deviceRed: 0.78, green: 0.11, blue: 0.11, alpha: 1)
+              : NSColor(deviceRed: 1.0, green: 0.30, blue: 0.28, alpha: 1)
+    }
+    static var trainManual: NSColor { accent }
+    static var trainMoving: NSColor {
+        isISO ? NSColor(deviceRed: 0.28, green: 0.40, blue: 0.30, alpha: 1)
+              : NSColor(deviceRed: 0.36, green: 1.0, blue: 0.42, alpha: 1)
+    }
+    static var trainDocked: NSColor {
+        isISO ? NSColor(deviceRed: 0.35, green: 0.35, blue: 0.37, alpha: 1)
+              : NSColor(deviceRed: 1.0, green: 0.72, blue: 0.20, alpha: 1)
+    }
+    static var trainIdle: NSColor {
+        isISO ? NSColor(deviceRed: 0.52, green: 0.52, blue: 0.54, alpha: 1)
+              : NSColor(deviceRed: 0.62, green: 0.45, blue: 0.12, alpha: 1)
+    }
+    static var trainLabel: NSColor {
+        isISO ? structure : NSColor(deviceRed: 0.36, green: 1.0, blue: 0.42, alpha: 1)
+    }
+    static func bodyGlow(_ color: NSColor) -> NSColor {
+        isISO ? .black : color.withAlphaComponent(0.45)
+    }
+
+    // Sliding doors.
+    static var doorway: NSColor { NSColor(white: isISO ? 0.10 : 0.02, alpha: 1) }
+    static var doorLeaf: NSColor { NSColor(white: isISO ? 0.80 : 0.72, alpha: 1) }
+    static var doorLeafGlow: NSColor { isISO ? .black : NSColor(white: 0.16, alpha: 1) }
+
+    // Pax dots: boarding shares the healthy family, alighting the info
+    // accent; self-lit in retro, flat under ISA-101.
+    static var paxBoarding: NSColor { trainMoving }
+    static var paxAlighting: NSColor { accent }
+    static func paxGlow(_ color: NSColor) -> NSColor { isISO ? .black : color }
+
+    // Billboard label textures: the VT323 phosphor face in retro, the
+    // system monospace under ISA-101 (same rule as `RetroTheme.mono`).
+    static func labelFont(size: CGFloat) -> NSFont {
+        if isISO { return .monospacedSystemFont(ofSize: size, weight: .semibold) }
+        return NSFont(name: RetroTheme.retroFontName, size: size)
+            ?? .monospacedSystemFont(ofSize: size, weight: .bold)
+    }
+}
+
 struct MetroSceneRepresentable: NSViewRepresentable {
     let world: MetroWorld
     let cantonShort: String
@@ -180,7 +309,7 @@ struct MetroSceneRepresentable: NSViewRepresentable {
     func makeNSView(context: Context) -> SCNView {
         let view = SCNView()
         view.scene = context.coordinator.scene
-        view.backgroundColor = .black
+        view.backgroundColor = ScenePalette.background
         view.allowsCameraControl = true
         view.autoenablesDefaultLighting = false
         view.antialiasingMode = .multisampling4X
@@ -283,7 +412,7 @@ struct MetroSceneRepresentable: NSViewRepresentable {
         // MARK: -- static scene
 
         private func buildStaticScene() {
-            scene.background.contents = NSColor.black
+            scene.background.contents = ScenePalette.background
 
             let camera = SCNCamera()
             camera.fieldOfView = 50
@@ -299,22 +428,23 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             let ambient = SCNNode()
             ambient.light = SCNLight()
             ambient.light?.type = .ambient
-            ambient.light?.color = NSColor(white: 0.35, alpha: 1)
+            ambient.light?.color = ScenePalette.ambientLight
             scene.rootNode.addChildNode(ambient)
 
             let key = SCNNode()
             key.light = SCNLight()
             key.light?.type = .omni
-            key.light?.color = NSColor(deviceRed: 1.0, green: 0.85, blue: 0.5, alpha: 1)
-            key.light?.intensity = 1400
+            key.light?.color = ScenePalette.keyLight
+            key.light?.intensity = ScenePalette.keyLightIntensity
             key.position = SCNVector3(0, 400, 0)
             scene.rootNode.addChildNode(key)
 
-            // Phosphor-grid floor: a dark plane with a faint emissive grid
-            // reads like a vector display rather than a daylight scene.
+            // The floor is the canvas: a dark faintly-reflective plane reads
+            // like a vector display in retro; a flat neutral-grey sheet under
+            // ISA-101.
             let floor = SCNFloor()
-            floor.reflectivity = 0.05
-            floor.firstMaterial?.diffuse.contents = NSColor(white: 0.03, alpha: 1)
+            floor.reflectivity = ScenePalette.floorReflectivity
+            floor.firstMaterial?.diffuse.contents = ScenePalette.floor
             floor.firstMaterial?.lightingModel = .constant
             let floorNode = SCNNode(geometry: floor)
             floorNode.position = SCNVector3(0, -1.5, 0)
@@ -322,13 +452,13 @@ struct MetroSceneRepresentable: NSViewRepresentable {
 
             // PCC marker at the centre of the loop.
             let hub = SCNBox(width: 12, height: 6, length: 12, chamferRadius: 0.5)
-            hub.firstMaterial?.diffuse.contents = NSColor(deviceRed: 1.0, green: 0.72, blue: 0.20, alpha: 1)
-            hub.firstMaterial?.emission.contents = NSColor(deviceRed: 0.5, green: 0.33, blue: 0.06, alpha: 1)
+            hub.firstMaterial?.diffuse.contents = ScenePalette.structure
+            hub.firstMaterial?.emission.contents = ScenePalette.structureGlow
             let hubNode = SCNNode(geometry: hub)
             hubNode.position = SCNVector3(0, 3, 0)
             scene.rootNode.addChildNode(hubNode)
             let hubLabel = makeBillboardLabel(text: "PCC", height: 10,
-                                              color: NSColor(deviceRed: 1.0, green: 0.72, blue: 0.20, alpha: 1))
+                                              color: ScenePalette.structure)
             hubLabel.position = SCNVector3(0, 14, 0)
             scene.rootNode.addChildNode(hubLabel)
 
@@ -354,14 +484,14 @@ struct MetroSceneRepresentable: NSViewRepresentable {
 
                 // Canton boundary marker + number.
                 let marker = SCNNode(geometry: SCNSphere(radius: 1.6))
-                marker.geometry?.firstMaterial?.diffuse.contents = NSColor(white: 0.85, alpha: 1)
-                marker.geometry?.firstMaterial?.emission.contents = NSColor(white: 0.35, alpha: 1)
+                marker.geometry?.firstMaterial?.diffuse.contents = ScenePalette.cantonMarker
+                marker.geometry?.firstMaterial?.emission.contents = ScenePalette.cantonMarkerGlow
                 marker.position = point(at: canton.startPosition)
                 scene.rootNode.addChildNode(marker)
 
                 let numLabel = makeBillboardLabel(
                     text: String(format: cantonShort, canton.id), height: 6,
-                    color: NSColor(deviceRed: 0.62, green: 0.45, blue: 0.12, alpha: 1))
+                    color: ScenePalette.dimText)
                 numLabel.position = point(at: canton.startPosition + canton.length / 2,
                                           y: 3, radialScale: 0.92)
                 scene.rootNode.addChildNode(numLabel)
@@ -371,8 +501,8 @@ struct MetroSceneRepresentable: NSViewRepresentable {
         private func drawStations() {
             for station in world.stations {
                 let platform = SCNBox(width: 10, height: 2, length: 24, chamferRadius: 0)
-                platform.firstMaterial?.diffuse.contents = NSColor(deviceRed: 0.16, green: 0.16, blue: 0.18, alpha: 1)
-                platform.firstMaterial?.emission.contents = NSColor(deviceRed: 0.10, green: 0.07, blue: 0.02, alpha: 1)
+                platform.firstMaterial?.diffuse.contents = ScenePalette.platform
+                platform.firstMaterial?.emission.contents = ScenePalette.platformGlow
                 let node = SCNNode(geometry: platform)
                 node.position = point(at: station.position, y: 1, radialScale: 1.10)
                 // Face the platform along the track tangent.
@@ -384,7 +514,7 @@ struct MetroSceneRepresentable: NSViewRepresentable {
 
                 let label = makeBillboardLabel(
                     text: station.name, height: 7,
-                    color: NSColor(deviceRed: 0.45, green: 0.95, blue: 1.0, alpha: 1))
+                    color: ScenePalette.accent)
                 label.position = point(at: station.position, y: 12, radialScale: 1.16)
                 scene.rootNode.addChildNode(label)
             }
@@ -396,19 +526,14 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             let mid = SCNVector3((from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2)
 
             let geometry = SCNCylinder(radius: radius, height: CGFloat(distance))
-            geometry.firstMaterial?.diffuse.contents = Self.trackColor
-            geometry.firstMaterial?.emission.contents = Self.trackGlow
+            geometry.firstMaterial?.diffuse.contents = ScenePalette.track
+            geometry.firstMaterial?.emission.contents = ScenePalette.trackGlow
 
             let node = SCNNode(geometry: geometry)
             node.position = mid
             node.look(at: to, up: scene.rootNode.worldUp, localFront: node.worldUp)
             return node
         }
-
-        private static let trackColor = NSColor(deviceRed: 0.55, green: 0.42, blue: 0.15, alpha: 1)
-        private static let trackGlow  = NSColor(deviceRed: 0.28, green: 0.20, blue: 0.05, alpha: 1)
-        private static let trackBarred = NSColor(white: 0.14, alpha: 1)
-        private static let trackBarredGlow = NSColor(white: 0.02, alpha: 1)
 
         // MARK: -- reconcile
 
@@ -465,8 +590,8 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             for canton in world.cantons {
                 let barred = barredCantons.contains(canton.id)
                 for node in cantonNodes[canton.id] ?? [] {
-                    node.geometry?.firstMaterial?.diffuse.contents = barred ? Self.trackBarred : Self.trackColor
-                    node.geometry?.firstMaterial?.emission.contents = barred ? Self.trackBarredGlow : Self.trackGlow
+                    node.geometry?.firstMaterial?.diffuse.contents = barred ? ScenePalette.trackBarred : ScenePalette.track
+                    node.geometry?.firstMaterial?.emission.contents = barred ? ScenePalette.trackBarredGlow : ScenePalette.trackGlow
                 }
             }
             for station in world.stations {
@@ -496,14 +621,14 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             scene.rootNode.addChildNode(root)
 
             let body = SCNNode(geometry: SCNBox(width: 6, height: 6, length: 20, chamferRadius: 0.8))
-            body.geometry?.firstMaterial?.diffuse.contents = NSColor(deviceRed: 0.36, green: 1.0, blue: 0.42, alpha: 1)
-            body.geometry?.firstMaterial?.emission.contents = NSColor(deviceRed: 0.10, green: 0.4, blue: 0.12, alpha: 1)
+            body.geometry?.firstMaterial?.diffuse.contents = ScenePalette.trainMoving
+            body.geometry?.firstMaterial?.emission.contents = ScenePalette.bodyGlow(ScenePalette.trainMoving)
             body.position = SCNVector3(0, 3, 0)
             root.addChildNode(body)
 
             let label = makeBillboardLabel(
                 text: train.label, height: 9,
-                color: NSColor(deviceRed: 0.36, green: 1.0, blue: 0.42, alpha: 1))
+                color: ScenePalette.trainLabel)
             label.position = SCNVector3(0, 14, 0)
             root.addChildNode(label)
 
@@ -511,14 +636,14 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             // dark recessed doorway with two sliding leaves that part when the
             // doors open. Local +x is radially outward, toward the platform.
             let doorway = SCNNode(geometry: SCNBox(width: 0.2, height: 4.4, length: 7.4, chamferRadius: 0))
-            doorway.geometry?.firstMaterial?.diffuse.contents = NSColor(white: 0.02, alpha: 1)
+            doorway.geometry?.firstMaterial?.diffuse.contents = ScenePalette.doorway
             doorway.geometry?.firstMaterial?.lightingModel = .constant
             doorway.position = SCNVector3(3.05, 3, 0)
             body.addChildNode(doorway)
 
             let leaf = SCNBox(width: 0.5, height: 4.4, length: 3.5, chamferRadius: 0.1)
-            leaf.firstMaterial?.diffuse.contents = NSColor(white: 0.72, alpha: 1)
-            leaf.firstMaterial?.emission.contents = NSColor(white: 0.16, alpha: 1)
+            leaf.firstMaterial?.diffuse.contents = ScenePalette.doorLeaf
+            leaf.firstMaterial?.emission.contents = ScenePalette.doorLeafGlow
             let doorLeft = SCNNode(geometry: leaf)
             doorLeft.position = SCNVector3(3.25, 3, -1.8)
             body.addChildNode(doorLeft)
@@ -538,19 +663,19 @@ struct MetroSceneRepresentable: NSViewRepresentable {
 
             let color: NSColor
             if train.isEmergencyBrakeApplied || train.status == .emergency {
-                color = NSColor(deviceRed: 1.0, green: 0.30, blue: 0.28, alpha: 1)
+                color = ScenePalette.trainAlarm
             } else if train.mode == .manual {
-                color = NSColor(deviceRed: 0.45, green: 0.95, blue: 1.0, alpha: 1)
+                color = ScenePalette.trainManual
             } else if train.status == .docked {
-                color = NSColor(deviceRed: 1.0, green: 0.72, blue: 0.20, alpha: 1)
+                color = ScenePalette.trainDocked
             } else if train.status == .moving {
-                color = NSColor(deviceRed: 0.36, green: 1.0, blue: 0.42, alpha: 1)
+                color = ScenePalette.trainMoving
             } else {
-                color = NSColor(deviceRed: 0.62, green: 0.45, blue: 0.12, alpha: 1)
+                color = ScenePalette.trainIdle
             }
             nodes.body.geometry?.firstMaterial?.diffuse.contents = color
             nodes.body.geometry?.firstMaterial?.emission.contents =
-                color.withAlphaComponent(0.45)
+                ScenePalette.bodyGlow(color)
 
             // Slide the doors on an open/close edge.
             if train.doorsOpen != nodes.lastDoorsOpen {
@@ -586,11 +711,9 @@ struct MetroSceneRepresentable: NSViewRepresentable {
             let end = boarding ? doorPos : platPos
 
             let dot = SCNNode(geometry: SCNSphere(radius: 0.55))
-            let c = boarding
-                ? NSColor(deviceRed: 0.36, green: 1.0, blue: 0.42, alpha: 1)
-                : NSColor(deviceRed: 0.45, green: 0.95, blue: 1.0, alpha: 1)
+            let c = boarding ? ScenePalette.paxBoarding : ScenePalette.paxAlighting
             dot.geometry?.firstMaterial?.diffuse.contents = c
-            dot.geometry?.firstMaterial?.emission.contents = c
+            dot.geometry?.firstMaterial?.emission.contents = ScenePalette.paxGlow(c)
             dot.geometry?.firstMaterial?.lightingModel = .constant
             dot.position = start
             scene.rootNode.addChildNode(dot)
@@ -602,12 +725,11 @@ struct MetroSceneRepresentable: NSViewRepresentable {
 
         // MARK: -- billboard text
 
-        /// A camera-facing label rendered in the bundled VT323 face onto a
+        /// A camera-facing label rendered in the skin's monospace face onto a
         /// texture plane (crisper and far cheaper than extruded SCNText).
         private func makeBillboardLabel(text: String, height: CGFloat, color: NSColor) -> SCNNode {
             let fontSize: CGFloat = 64
-            let font = NSFont(name: RetroTheme.retroFontName, size: fontSize)
-                ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold)
+            let font = ScenePalette.labelFont(size: fontSize)
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: font, .foregroundColor: color
             ]

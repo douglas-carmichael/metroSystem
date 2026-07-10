@@ -62,13 +62,19 @@ struct PCCControlWindow: View {
         .navigationTitle(language.t("window.control"))
         .onAppear {
             ensureFocus()
-            // Demo / screenshot affordance: `-openDetail` auto-pops the
-            // first train's detail window shortly after launch.
+            // Demo / screenshot affordances: `-openDetail` auto-pops the
+            // first train's detail window shortly after launch; `-openScene`
+            // does the same for the 3D line synoptic.
             if ProcessInfo.processInfo.arguments.contains("-openDetail") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     if let first = world.sortedTrains.first {
                         openWindow(id: "train-detail", value: first.id)
                     }
+                }
+            }
+            if ProcessInfo.processInfo.arguments.contains("-openScene") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    openWindow(id: "scene")
                 }
             }
         }
