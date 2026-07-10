@@ -727,6 +727,11 @@ struct MetroSceneRepresentable: NSViewRepresentable {
 
         /// A camera-facing label rendered in the skin's monospace face onto a
         /// texture plane (crisper and far cheaper than extruded SCNText).
+        /// Measured and drawn from the same CTLine: NSStringDrawing can lay
+        /// a line out slightly wider at draw time than `size()` reported
+        /// (font-cascade resolution differs per process), which truncated
+        /// the last glyph of accented station names. One CTLine cannot
+        /// disagree with itself.
         private func makeBillboardLabel(text: String, height: CGFloat, color: NSColor) -> SCNNode {
             let fontSize: CGFloat = 64
             let font = ScenePalette.labelFont(size: fontSize)
@@ -734,22 +739,43 @@ struct MetroSceneRepresentable: NSViewRepresentable {
                 .font: font, .foregroundColor: color
             ]
             let str = NSAttributedString(string: text, attributes: attrs)
-            let size = str.size()
-            let imgW = ceil(size.width) + 16
-            let imgH = ceil(size.height) + 8
+            let line = CTLineCreateWithAttributedString(str)
+            var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+            let advance = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, &leading))
+            let pad: CGFloat = 12       // absorbs glyph side-bearing overhang
+            let imgW = ceil(advance) + pad * 2
+            let imgH = ceil(ascent + descent) + 8
 
-            let img = NSImage(size: NSSize(width: imgW, height: imgH))
-            img.lockFocus()
-            NSColor.clear.set()
-            NSBezierPath.fill(NSRect(x: 0, y: 0, width: imgW, height: imgH))
-            str.draw(at: NSPoint(x: 8, y: 4))
-            img.unlockFocus()
+            // Rasterize at 2x into an explicit bitmap and hand SceneKit the
+            // raw CGImage: routing the NSImage itself into the material let
+            // SceneKit's image conversion truncate the right edge of wide
+            // NPOT label textures at close camera range.
+            let scale: CGFloat = 2
+            let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: Int(imgW * scale), pixelsHigh: Int(imgH * scale),
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                isPlanar: false, colorSpaceName: .deviceRGB,
+                bytesPerRow: 0, bitsPerPixel: 0)!
+            let gctx = NSGraphicsContext(bitmapImageRep: rep)!
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = gctx
+            let ctx = gctx.cgContext
+            ctx.scaleBy(x: scale, y: scale)
+            ctx.textPosition = CGPoint(x: pad, y: 4 + descent)
+            CTLineDraw(line, ctx)
+            NSGraphicsContext.restoreGraphicsState()
 
             let aspect = imgW / imgH
             let plane = SCNPlane(width: height * aspect, height: height)
-            plane.firstMaterial?.diffuse.contents = img
+            plane.firstMaterial?.diffuse.contents = rep.cgImage
             plane.firstMaterial?.lightingModel = .constant
             plane.firstMaterial?.isDoubleSided = true
+            // Labels are overlay text: without this, the quad's transparent
+            // margin still writes depth, and wherever two billboards overlap
+            // at a grazing camera angle the farther-sorted one punches a
+            // straight-edged hole through the nearer one's glyphs.
+            plane.firstMaterial?.writesToDepthBuffer = false
 
             let node = SCNNode(geometry: plane)
             node.constraints = [SCNBillboardConstraint()]

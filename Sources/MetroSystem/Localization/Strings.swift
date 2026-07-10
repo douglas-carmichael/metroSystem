@@ -46,7 +46,7 @@ enum Strings {
 
         // Per-rame detail window.
         add("detail.signallost",    "SIGNAL LOST — train withdrawn",       "SIGNAL PERDU — rame retirée")
-        add("detail.subtitle",      "VEHICLE SYNOPSIS — TCMS",             "SYNTHÈSE VÉHICULE — TCMS")
+        add("detail.subtitle",      "VEHICLE SYNOPSIS",                    "SYNTHÈSE VÉHICULE")
         add("btn.detail",           "DETAIL",                              "DÉTAIL")
         add("detail.gauge.speed",   "SPEED",                               "VITESSE")
         add("detail.gauge.consigne","SP",                                  "CONS")
