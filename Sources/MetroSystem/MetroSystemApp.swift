@@ -76,7 +76,7 @@ struct MetroSystemApp: App {
         .restorationDisabled()
 
         // Per-rame detail window, keyed by train id: each distinct train
-        // opens its own TCMS synoptic (the DC CBTC "train detail" screen).
+        // opens its own TCMS "train detail" synoptic.
         WindowGroup("Train Detail", id: "train-detail", for: UUID.self) { $trainId in
             if let trainId {
                 TrainDetailWindow(trainId: trainId)
