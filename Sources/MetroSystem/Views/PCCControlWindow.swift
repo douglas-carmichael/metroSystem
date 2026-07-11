@@ -1080,7 +1080,7 @@ private struct CreditsOverlay: View {
                             role: language.t("credits.role.metro"),
                             name: "Douglas Carmichael",
                             email: "dcarmich@dcarmichael.net",
-                            url: language.t("credits.metro.detail")
+                            url: "github.com/douglas-carmichael/metroSystem"
                         )
                         creditBlock(
                             role: language.t("credits.role.retro"),

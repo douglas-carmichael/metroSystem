@@ -105,8 +105,8 @@ enum Strings {
         add("detail.diag.auto.door","DOOR FAULT / SAFETY LOOP OPEN",      "DÉFAUT PORTES / BOUCLE DE SÉCURITÉ OUVERTE")
         add("detail.diag.auto.estop","EMERGENCY STOP FROM PCC",           "ARRÊT D'URGENCE CMD PCC")
         add("detail.diag.auto.nominal","NOMINAL / SAFETY CHAIN MADE",     "NOMINAL / CHAÎNE FS ÉTABLIE")
-        // Auxiliary controls (owner-driven telecommands from the DC CBTC
-        // train-detail screen) and the electrical-synoptic diagram.
+        // Auxiliary controls (owner-driven telecommands on the train-detail
+        // screen) and the electrical-synoptic diagram.
         add("detail.sec.diagram",   "ELECTRICAL SYNOPTIC",                "SYNOPTIQUE ÉLECTRIQUE")
         add("detail.sec.controls",  "AUXILIARY CONTROLS",                 "COMMANDES AUXILIAIRES")
         add("detail.controls.remote","REMOTE RAME — CONTROLS READ-ONLY",  "RAME DISTANTE — COMMANDES EN LECTURE SEULE")
@@ -187,7 +187,6 @@ enum Strings {
         add("credits.dismiss",      "Click or press ESC to close",         "Cliquez ou appuyez ESC pour fermer")
         add("credits.role.metro",   "CBTC METRO SIMULATION",               "SIMULATION MÉTRO CBTC")
         add("credits.role.retro",   "RETRO UI & OpenVMS DCL SHELL",        "UI RÉTRO & SHELL DCL OpenVMS")
-        add("credits.metro.detail", "After the DC CBTC metro simulator",   "D'après le simulateur de métro DC CBTC")
 
         add("banner.title",         "PCC — METRO LINE 1",                  "PCC — MÉTRO LIGNE 1")
         add("banner.subtitle",      "VSI OpenVMS V9.2-3   TERMINAL VT320", "VSI OpenVMS V9.2-3   TERMINAL VT320")

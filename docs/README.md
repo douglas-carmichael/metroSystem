@@ -16,8 +16,8 @@ English | Français
 ## Train Detail (per-rame TCMS synoptic)
 
 Double-click a train card's **DETAIL** button for a dedicated per-rame
-status screen — the DC CBTC "train detail" TCMS synoptic reimagined in
-retro phosphor: a speed dial with the asservissement setpoint needle,
+status screen — a TCMS "train detail" synoptic in retro phosphor: a speed
+dial with the asservissement setpoint needle,
 movement-authority / passenger / traction meters, the speed-regulation,
 traction/braking, operations, ATP chaîne-de-sécurité and auxiliary
 sections, and the eight VAL tires drawn as two bogies of circular pressure

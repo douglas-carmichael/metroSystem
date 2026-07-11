@@ -1,8 +1,8 @@
 # MetroSystem
 
 A native macOS / SwiftUI **CBTC metro simulator** with a retro VT320 /
-OpenVMS aesthetic — a single-process rebuild of the DC CBTC metro simulator
-on the [elevatorSystem](https://github.com/lapatatedouce59/elevatorSystem)
+OpenVMS aesthetic, built on the
+[elevatorSystem](https://github.com/lapatatedouce59/elevatorSystem)
 retro harness. One app, four windows, bilingual EN / FR throughout, with a
 headless cluster daemon and a Modbus TCP interface for external tooling.
 
@@ -32,14 +32,14 @@ English | Français
   train card's DETAIL button): a speed dial with the setpoint needle,
   MA / passenger / traction meters, the diagnostic sections, the ATP
   chaîne-de-sécurité, and the eight VAL tires as two bogies of pressure
-  gauges. Modelled on the DC CBTC train-detail screen.
+  gauges.
 
 See [docs/](docs/README.md) for the detail-window, 3D synoptic and DCL
 screenshots.
 
 ## Simulation
 
-The DC CBTC model made single-process: a 60 Hz PLC-scan `MetroWorld` where
+A 60 Hz PLC-scan `MetroWorld` where
 each train runs the asservissement speed regulation (braking curve +
 proportional control + emergency-brake envelope + tire-adhesion / patinage
 / enrayage model) against a movement authority recomputed every scan by the
@@ -180,8 +180,7 @@ work in either mode.
 
 ## Credits
 
-- **CBTC metro simulation** — Douglas Carmichael, after the DC CBTC
-  client/server metro simulator.
+- **CBTC metro simulation** — Douglas Carmichael.
 - **Retro UI, OpenVMS DCL shell and simulation harness** — adapted from
   [elevatorSystem](https://github.com/lapatatedouce59/elevatorSystem)
   (Amaury Crocquefer; macOS/SwiftUI port Douglas Carmichael).
