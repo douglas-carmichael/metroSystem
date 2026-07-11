@@ -99,7 +99,6 @@ struct MetroSystemApp: App {
             return
         }
         world.seedTrains()
-        world.start()
         network.attach(world: world)
         network.start()
         telnet.attach(world: world, network: network, language: language,
@@ -107,6 +106,12 @@ struct MetroSystemApp: App {
         telnet.start()
         modbus.attach(world: world, network: network, telnet: telnet)
         modbus.start()
+        // Model-track hardware bridge: starts its output scan but stays
+        // DISABLED until the operator arms it (SET HARDWARE /ENABLE).
+        HardwareBridge.shared.attach(world: world)
+        // Backend selection (VAL / PRATIC_SIM / PRATIC_HW): attaching
+        // starts the default VALSimBackend against the seeded fleet.
+        BackendManager.shared.attach(world: world)
     }
 
     /// Looks for another running MetroSystem process on this Mac. A second

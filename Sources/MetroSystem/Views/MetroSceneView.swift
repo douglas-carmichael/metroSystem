@@ -441,12 +441,26 @@ struct MetroSceneRepresentable: NSViewRepresentable {
 
             // The floor is the canvas: a dark faintly-reflective plane reads
             // like a vector display in retro; a flat neutral-grey sheet under
-            // ISA-101.
-            let floor = SCNFloor()
-            floor.reflectivity = ScenePalette.floorReflectivity
-            floor.firstMaterial?.diffuse.contents = ScenePalette.floor
-            floor.firstMaterial?.lightingModel = .constant
-            let floorNode = SCNNode(geometry: floor)
+            // ISA-101. SCNFloor always spins up a reflection ("FloorPass")
+            // render pass, so we only pay for it when reflectivity > 0 --
+            // otherwise SceneKit logs that the unused pass is being ignored.
+            // The non-reflective case is a plain finite plane laid flat,
+            // sized well past zFar so it still fills the horizon.
+            let floorNode: SCNNode
+            if ScenePalette.floorReflectivity > 0 {
+                let floor = SCNFloor()
+                floor.reflectivity = ScenePalette.floorReflectivity
+                floor.firstMaterial?.diffuse.contents = ScenePalette.floor
+                floor.firstMaterial?.lightingModel = .constant
+                floorNode = SCNNode(geometry: floor)
+            } else {
+                let plane = SCNPlane(width: 12000, height: 12000)
+                plane.firstMaterial?.diffuse.contents = ScenePalette.floor
+                plane.firstMaterial?.lightingModel = .constant
+                plane.firstMaterial?.isDoubleSided = true
+                floorNode = SCNNode(geometry: plane)
+                floorNode.eulerAngles.x = -.pi / 2   // lay the plane flat
+            }
             floorNode.position = SCNVector3(0, -1.5, 0)
             scene.rootNode.addChildNode(floorNode)
 

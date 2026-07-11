@@ -30,6 +30,9 @@ enum Strings {
         "alarm.msg.paxfull", "alarm.msg.doorheld",
         "alarm.msg.controller", "alarm.msg.power", "alarm.msg.track",
         "alarm.msg.platform", "alarm.msg.display", "alarm.msg.switch",
+        "alarm.msg.hwlink",
+        "alarm.msg.deloc", "alarm.msg.comms", "alarm.msg.wayside",
+        "alarm.msg.pratictransport",
     ]
 
     private static func buildTable() -> [String: [Lang: String]] {
@@ -325,6 +328,16 @@ enum Strings {
                                     "Portes maintenues ouvertes au-delà du stationnement")
         add("alarm.msg.controller", "PCC controller watchdog fault -- all trains held",
                                     "Défaut chien de garde PCC -- toutes rames retenues")
+        add("alarm.msg.hwlink",     "Model-track hardware link down while output armed",
+                                    "Liaison matériel voie miniature perdue, sortie armée")
+        add("alarm.msg.deloc",      "Train delocalized -- position lost, manual re-reference required",
+                                    "Rame délocalisée -- position perdue, re-référencement manuel requis")
+        add("alarm.msg.comms",      "Train-to-wayside comms degraded or lost",
+                                    "Liaison sol-train dégradée ou perdue")
+        add("alarm.msg.wayside",    "Wayside sensor station fault",
+                                    "Défaut station de détection au sol")
+        add("alarm.msg.pratictransport", "PRATIC telemetry transport down",
+                                    "Transport de télémesure PRATIC coupé")
         add("alarm.msg.power",      "750 V traction supply fault",
                                     "Défaut alimentation traction 750 V")
         add("alarm.msg.track",      "Track-circuit inconsistency reported",
@@ -496,6 +509,138 @@ enum Strings {
         add("modbus.reg.shelved",   "Shelved alarms (SHLVD)",              "Alarmes suspendues (SUSP)")
         add("modbus.reg.rtn",       "Returned-to-normal, unacked (RTN)",   "Retour à la normale, non acquittées (RAN)")
         add("modbus.reg.tracklen",  "Track length (metres)",               "Longueur de la voie (mètres)")
+
+        // Model-track hardware link (SHOW HARDWARE / SET HARDWARE).
+        add("hardware.title",       "MODEL-TRACK HARDWARE LINK",           "LIAISON MATÉRIEL VOIE MINIATURE")
+        add("hardware.driver",      "Driver",                              "Pilote")
+        add("hardware.link",        "Link",                                "Liaison")
+        add("hardware.output",      "Output",                              "Sortie")
+        add("hardware.output.enabled","ENABLED",                           "ACTIVÉE")
+        add("hardware.output.disabled","DISABLED",                         "DÉSACTIVÉE")
+        add("hardware.nodriver",    "none selected",                       "aucun sélectionné")
+        add("hardware.endpoint",    "Endpoint: %@ port %d",                "Point d'accès : %@ port %d")
+        add("hardware.stats",       "Throttle scale: %.2f   Sensor resync: %@   Frames sent: %d",
+                                    "Échelle traction : %.2f   Recalage capteurs : %@   Trames émises : %d")
+        add("hardware.unitmap",     "Unit map (rame -> hardware unit):",   "Table des unités (rame -> unité matérielle) :")
+        add("hardware.unitmap.default","(unmapped rames use their numeric label as the unit)",
+                                    "(les rames non affectées utilisent leur numéro comme unité)")
+        add("hardware.drivers.available","Available drivers:",             "Pilotes disponibles :")
+        add("hardware.sensors.recent","Recent layout sensor events:",      "Derniers événements capteurs de la voie :")
+        add("hardware.sensors.none","none",                                "aucun")
+        add("hardware.sensor.active","ACTIVE",                             "ACTIF")
+        add("hardware.sensor.clear","CLEAR",                               "LIBRE")
+        add("hardware.hint",        "SET HARDWARE /DRIVER=name /HOST=h /PORT=n /CONNECT /ENABLE arms the output",
+                                    "SET HARDWARE /DRIVER=nom /HOST=h /PORT=n /CONNECT /ENABLE arme la sortie")
+        add("hardware.state.offline","OFFLINE",                            "HORS LIGNE")
+        add("hardware.state.connecting","CONNECTING",                      "CONNEXION")
+        add("hardware.state.ready", "READY",                               "PRÊTE")
+        add("hardware.state.failed","FAILED (%@)",                         "DÉFAUT (%@)")
+        add("hardware.set.driver.ok","Driver set to %@.",                  "Pilote réglé sur %@.")
+        add("hardware.set.driver.bad","No such driver: %@ -- SHOW HARDWARE lists the available drivers.",
+                                    "Pilote inconnu : %@ -- SHOW HARDWARE liste les pilotes disponibles.")
+        add("hardware.set.endpoint.ok","Endpoint set to %@ port %d.",      "Point d'accès réglé sur %@ port %d.")
+        add("hardware.set.unit.ok", "Rame %@ mapped to hardware unit %d.", "Rame %@ affectée à l'unité matérielle %d.")
+        add("hardware.set.unit.clear","Rame %@ unmapped.",                 "Affectation de la rame %@ supprimée.")
+        add("hardware.set.unit.bad","Usage: /UNIT=(rame,unit) to map, /UNIT=(rame) to clear.",
+                                    "Usage : /UNIT=(rame,unité) pour affecter, /UNIT=(rame) pour supprimer.")
+        add("hardware.set.scale.ok","Throttle scale set to %.2f.",         "Échelle de traction réglée à %.2f.")
+        add("hardware.set.scale.bad","Scale must be between 0.05 and 2.00.",
+                                    "L'échelle doit être comprise entre 0.05 et 2.00.")
+        add("hardware.set.resync.on","Sensor position resync ON.",         "Recalage de position par capteurs ACTIVÉ.")
+        add("hardware.set.resync.off","Sensor position resync OFF.",       "Recalage de position par capteurs DÉSACTIVÉ.")
+        add("hardware.set.connect", "Connecting to %@ port %d ...",        "Connexion à %@ port %d ...")
+        add("hardware.set.disconnect","Link closed; stop-all sent first.", "Liaison fermée ; arrêt général envoyé au préalable.")
+        add("hardware.set.noconnect","No driver selected -- SET HARDWARE /DRIVER=name first.",
+                                    "Aucun pilote sélectionné -- SET HARDWARE /DRIVER=nom d'abord.")
+        add("hardware.set.enable.on","Hardware output ENABLED -- local rames now drive the physical units.",
+                                    "Sortie matériel ACTIVÉE -- les rames locales pilotent les unités physiques.")
+        add("hardware.set.enable.off","Hardware output DISABLED -- stop-all sent to the layout.",
+                                    "Sortie matériel DÉSACTIVÉE -- arrêt général envoyé à la voie.")
+        add("hardware.set.power.on","Track power ON.",                     "Alimentation de la voie MARCHE.")
+        add("hardware.set.power.off","Track power OFF.",                   "Alimentation de la voie ARRÊT.")
+        add("hardware.set.power.unsup","The selected driver does not control track power (or the link is down).",
+                                    "Le pilote sélectionné ne gère pas l'alimentation de la voie (ou la liaison est coupée).")
+        add("hardware.set.missqual","Missing qualifier -- see HELP SET HARDWARE.",
+                                    "Qualificatif manquant -- voir HELP SET HARDWARE.")
+
+        // Backend selection (SHOW/SET BACKEND) and the PRATIC network
+        // surface (SHOW/SET PRATIC).
+        add("backend.title",        "STATE BACKENDS (* = active)",         "MOTEURS D'ÉTAT (* = actif)")
+        add("backend.val.summary",  "Self-contained VAL simulation (the classic line)",
+                                    "Simulation VAL autonome (la ligne classique)")
+        add("backend.sim.summary",  "PRATIC moving-block CBTC, simulated (no hardware)",
+                                    "CBTC à canton mobile PRATIC, simulé (sans matériel)")
+        add("backend.hw.summary",   "PRATIC real network via telemetry transport (GoA4 supervision)",
+                                    "Réseau PRATIC réel via transport de télémesure (supervision GoA4)")
+        add("backend.transport",    "Telemetry transport: %@",             "Transport de télémesure : %@")
+        add("backend.hint",         "SET BACKEND VAL | PRATIC_SIM | PRATIC_HW switches (replaces the local fleet)",
+                                    "SET BACKEND VAL | PRATIC_SIM | PRATIC_HW bascule (remplace la flotte locale)")
+        add("backend.set.usage",    "Usage: SET BACKEND VAL | PRATIC_SIM | PRATIC_HW",
+                                    "Usage : SET BACKEND VAL | PRATIC_SIM | PRATIC_HW")
+        add("backend.set.bad",      "No such backend: %@ -- SHOW BACKEND lists them.",
+                                    "Moteur d'état inconnu : %@ -- SHOW BACKEND les liste.")
+        add("backend.set.ok",       "Backend switched to %@ -- local fleet replaced.",
+                                    "Moteur d'état basculé sur %@ -- flotte locale remplacée.")
+        add("backend.set.noworld",  "Backend manager not attached yet.",
+                                    "Gestionnaire de moteurs d'état non attaché.")
+        add("pratic.title",         "PRATIC NETWORK -- moving-block CBTC picture",
+                                    "RÉSEAU PRATIC -- image CBTC à canton mobile")
+        add("pratic.notactive",     "No PRATIC backend active -- SET BACKEND PRATIC_SIM or PRATIC_HW first.",
+                                    "Aucun moteur PRATIC actif -- SET BACKEND PRATIC_SIM ou PRATIC_HW d'abord.")
+        add("pratic.trains.header", "Train   Position   Seg     Speed/Cmd       MA      Link      Confidence    ±Unc",
+                                    "Rame    Position   Seg     Vitesse/Cons    AM      Liaison   Confiance     ±Inc")
+        add("pratic.trains.none",   "no trains reported yet",              "aucune rame signalée pour l'instant")
+        add("pratic.wayside.header","Wayside sensor stations:",            "Stations de détection au sol :")
+        add("pratic.wayside.ok",    "OK",                                  "OK")
+        add("pratic.wayside.fault", "FAULT",                               "DÉFAUT")
+        add("pratic.wayside.seen",  "last detection %d s ago",             "dernière détection il y a %d s")
+        add("pratic.wayside.never", "no detection yet",                    "aucune détection pour l'instant")
+        add("pratic.turnouts.header","Turnouts:",                          "Aiguillages :")
+        add("pratic.turnout.normal","NORMAL",                              "DIRECTE")
+        add("pratic.turnout.reverse","REVERSE",                            "DÉVIÉE")
+        add("pratic.turnout.locked","LOCKED",                              "VERROUILLÉ")
+        add("pratic.balises",       "%d balises (canton-entry reference points)",
+                                    "%d balises (points de référence en entrée de canton)")
+        add("pratic.hint",          "SET PRATIC /MA= /TARGET= /RELOCALIZE= /TURNOUT= /INJECT= -- see HELP SET PRATIC",
+                                    "SET PRATIC /MA= /TARGET= /RELOCALIZE= /TURNOUT= /INJECT= -- voir HELP SET PRATIC")
+        add("pratic.link.ok",       "OK",                                  "OK")
+        add("pratic.link.degraded", "DEGRADED",                            "DÉGRADÉE")
+        add("pratic.link.lost",     "LOST",                                "PERDUE")
+        add("pratic.conf.localized","LOCALIZED",                           "LOCALISÉE")
+        add("pratic.conf.uncertain","UNCERTAIN",                           "INCERTAINE")
+        add("pratic.conf.delocalized","DELOCALIZED",                       "DÉLOCALISÉE")
+        add("pratic.set.notrain",   "No such PRATIC train: %@",            "Rame PRATIC inconnue : %@")
+        add("pratic.set.ma.ok",     "Movement authority for %@ restricted to %.0f m.",
+                                    "Autorisation de mouvement de %@ restreinte à %.0f m.")
+        add("pratic.set.ma.off",    "Manual movement-authority restriction on %@ lifted.",
+                                    "Restriction manuelle d'autorisation sur %@ levée.")
+        add("pratic.set.ma.usage",  "Usage: /MA=(train,limit-m) or /MA=(train,OFF)",
+                                    "Usage : /MA=(rame,limite-m) ou /MA=(rame,OFF)")
+        add("pratic.set.target.ok", "Target speed for %@ set to %.1f m/s.",
+                                    "Vitesse cible de %@ réglée à %.1f m/s.")
+        add("pratic.set.target.usage","Usage: /TARGET=(train,m/s)",        "Usage : /TARGET=(rame,m/s)")
+        add("pratic.set.reloc.ok",  "Re-localization of %@ commanded against the balise.",
+                                    "Re-référencement de %@ commandé sur la balise.")
+        add("pratic.set.reloc.usage","Usage: /RELOCALIZE=train or /RELOCALIZE=(train,balise)",
+                                    "Usage : /RELOCALIZE=rame ou /RELOCALIZE=(rame,balise)")
+        add("pratic.set.turnout.normal","Turnout %d thrown to NORMAL.",    "Aiguillage %d en position DIRECTE.")
+        add("pratic.set.turnout.reverse","Turnout %d thrown to REVERSE.",  "Aiguillage %d en position DÉVIÉE.")
+        add("pratic.set.turnout.bad","Turnout %d unknown or locked.",      "Aiguillage %d inconnu ou verrouillé.")
+        add("pratic.set.turnout.usage","Usage: /TURNOUT=(id,NORMAL|REVERSE)",
+                                    "Usage : /TURNOUT=(id,DIRECTE|DÉVIÉE)")
+        add("pratic.set.inject.ok", "Failure injected.",                   "Défaillance injectée.")
+        add("pratic.set.restore.ok","Injected failure cleared.",           "Défaillance injectée levée.")
+        add("pratic.set.inject.usage","Usage: /INJECT=COMMS:train or /INJECT=SENSOR:station",
+                                    "Usage : /INJECT=COMMS:rame ou /INJECT=SENSOR:station")
+        add("pratic.set.inject.unsup","Injection applies to the simulated backend only.",
+                                    "L'injection ne s'applique qu'au moteur simulé.")
+        add("pratic.set.transport.ok","Transport configured.",             "Transport configuré.")
+        add("pratic.set.transport.bad","Transport unavailable on this backend (or unknown kind).",
+                                    "Transport indisponible sur ce moteur (ou type inconnu).")
+        add("pratic.set.connect",   "Transport connecting ...",            "Connexion du transport ...")
+        add("pratic.set.disconnect","Transport disconnected.",             "Transport déconnecté.")
+        add("pratic.set.missqual",  "Missing qualifier -- see HELP SET PRATIC.",
+                                    "Qualificatif manquant -- voir HELP SET PRATIC.")
 
         // DCL generic bits.
         add("dcl.page.more",        "  -- more (%d/%d) -- RETURN for next page, Q to quit --\n",

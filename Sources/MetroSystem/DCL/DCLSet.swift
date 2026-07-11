@@ -15,6 +15,9 @@ extension DCLEngine {
         case matches(what, "PASSWORD", min: 4): return setPassword()
         case matches(what, "PROCESS", min: 4):  return setProcess(cmd)
         case matches(what, "STANDARD", min: 3): return setStandard(cmd)
+        case matches(what, "HARDWARE", min: 4): return setHardware(cmd)
+        case matches(what, "BACKEND", min: 4):  return setBackend(cmd)
+        case matches(what, "PRATIC", min: 4):   return setPratic(cmd)
         case matches(what, "RAME", min: 4):     return setRame(cmd)
         case matchesLoc(what, en: "LINE", fr: "LIGNE", min: 4):
             return setLigne(cmd)

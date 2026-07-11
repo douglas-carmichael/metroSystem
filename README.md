@@ -62,6 +62,29 @@ cd ClusterDaemon && swift run metro-clusterd --nodes 2 --trains 2
 See [ClusterDaemon/README.md](ClusterDaemon/README.md) for the daemon and
 the app↔daemon wire-mirror pairs.
 
+## Backends — VAL and PRATIC
+
+The app is also the PCC front end for **PRATIC** (Projet de Réseau
+Automatique de Trains Inter-Connectés), a model-scale CBTC autopilot.
+`SET BACKEND` in the terminal switches the engine behind the whole UI:
+
+- **VAL** — the self-contained simulation above (default).
+- **PRATIC_SIM** — a simulated moving-block CBTC network: continuous
+  position/heartbeat reporting, balise fixes, link status
+  (OK/DEGRADED/LOST), position confidence
+  (LOCALIZED/UNCERTAIN/DELOCALIZED), wayside sensor stations, turnouts,
+  and injectable failures (`SET PRATIC /INJECT=COMMS:201`).
+  Delocalization recovery is the explicit
+  `SET PRATIC /RELOCALIZE=(201,4)` re-reference the real system needs.
+- **PRATIC_HW** — the real network, supervised over a pluggable
+  telemetry transport (newline-JSON TCP works today; a serial/RF stub
+  marks the integration point). The trains drive themselves (GoA4);
+  the front end issues authorities and commands and treats staleness
+  as a first-class state.
+
+`SHOW PRATIC` is the live moving-block picture; details in
+[docs/pratic-backends.md](docs/pratic-backends.md).
+
 ## Modbus TCP
 
 A Modbus TCP slave on **`localhost:5020`** exposes live train telemetry,
@@ -69,6 +92,27 @@ the chaîne-de-sécurité contacts, and control coils/registers so `mbpoll`,
 `pymodbus`, OpenPLC or Node-RED can read and drive trains. Press **M** in
 the PCC Dispatcher, or `SHOW MODBUS` in the terminal, for the live map.
 Full layout: [docs/modbus-register-map.md](docs/modbus-register-map.md).
+
+## Model-track hardware (plugin drivers)
+
+The simulator can drive **physical model trains**: a hardware bridge
+mirrors every locally-owned rame onto the layout through a pluggable
+driver — a [DCC-EX](https://dcc-ex.com) command station over TCP, a
+generic newline-JSON TCP gateway (write a tiny external process in any
+language and it becomes the driver), or a console dry-run for rehearsal.
+Occupancy detectors can feed back and resync the simulated positions.
+Everything is operated from the DCL terminal:
+
+```
+$ SET HARDWARE /DRIVER=DCCEX /HOST=192.168.1.50 /UNIT=(101,3)
+$ SET HARDWARE /CONNECT /POWER=ON /ENABLE
+```
+
+The output is disabled at every launch, stop-all is sent on disable or
+disconnect, and an FU becomes the protocol's emergency stop. Details and
+the driver-writing guide: [docs/hardware-drivers.md](docs/hardware-drivers.md).
+This drives hobby model railways only — it is still a simulator, not a
+safety controller.
 
 ## Build & run
 
