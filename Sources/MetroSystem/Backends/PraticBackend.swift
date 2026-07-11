@@ -53,18 +53,24 @@ enum PraticInjection {
     case sensorRestore(stationId: Int)
 }
 
+/// What every state engine provides: a start/stop lifecycle around the
+/// scan (or watchdog) that puts train state into MetroWorld. VAL and the
+/// two PRATIC engines all conform, so BackendManager swaps them freely.
+@MainActor
+protocol MetroBackendEngine: AnyObject {
+    func start()
+    func stop()
+}
+
 /// The command surface of a PRATIC backend -- the Section 6 controls of
 /// the brief. Label-addressed because that is what the operator types.
 /// Every mutator returns false when the target does not resolve (or the
 /// operation is not supported by this backend).
 @MainActor
-protocol PraticBackend: AnyObject {
+protocol PraticBackend: MetroBackendEngine {
     var network: PraticNetwork { get }
     /// Health of the path to the state source (.ready always, for the sim).
     var transportState: HardwareLinkState { get }
-
-    func start()
-    func stop()
 
     @discardableResult func issueMovementAuthority(label: String, limit: Double?) -> Bool
     @discardableResult func setTargetSpeed(label: String, speed: Double) -> Bool
@@ -85,15 +91,24 @@ final class BackendManager: ObservableObject {
     static let shared = BackendManager()
 
     @Published private(set) var kind: BackendKind = .val
-    private(set) var pratic: (any PraticBackend)? = nil
+    /// The engine currently putting state into the world.
+    private(set) var engine: (any MetroBackendEngine)? = nil
     private weak var world: MetroWorld?
+
+    /// The active engine's PRATIC command surface, when it has one (the
+    /// SET/SHOW PRATIC verbs read this; nil under the VAL backend).
+    var pratic: (any PraticBackend)? { engine as? any PraticBackend }
 
     private init() {}
 
-    /// Called once from bootstrap(). The VAL backend is already running
-    /// (world.start()); nothing else to do until the operator switches.
+    /// Called once from bootstrap(): wires the world and starts the
+    /// default VAL engine (the fleet was seeded by bootstrap).
     func attach(world: MetroWorld) {
         self.world = world
+        guard engine == nil else { return }
+        let val = VALSimBackend(world: world)
+        engine = val
+        val.start()
     }
 
     /// Switch backends: stop the current engine, replace the locally-
@@ -104,26 +119,24 @@ final class BackendManager: ObservableObject {
         guard let world else { return false }
         guard newKind != kind else { return true }
 
-        pratic?.stop()
-        pratic = nil
-        world.stop()
+        engine?.stop()
+        engine = nil
         for train in world.locallyOwned() {
             world.removeTrain(id: train.id)
         }
 
+        let fresh: any MetroBackendEngine
         switch newKind {
         case .val:
             world.seedTrains()
-            world.start()
+            fresh = VALSimBackend(world: world)
         case .praticSim:
-            let engine = PraticSimBackend(world: world)
-            pratic = engine
-            engine.start()
+            fresh = PraticSimBackend(world: world)
         case .praticHardware:
-            let engine = PraticHardwareBackend(world: world)
-            pratic = engine
-            engine.start()
+            fresh = PraticHardwareBackend(world: world)
         }
+        engine = fresh
+        fresh.start()
         kind = newKind
         return true
     }

@@ -9,7 +9,7 @@ engine puts that state on screen is the backend**, and there are three:
 
 | Backend      | What it is | Selected with |
 |--------------|------------|---------------|
-| `VAL`        | The original self-contained VAL simulation (default — unchanged behaviour). | `SET BACKEND VAL` |
+| `VAL`        | The classic VAL simulation (`VALSimBackend` — the scan extracted from `MetroWorld`; default, behaviour unchanged). | `SET BACKEND VAL` |
 | `PRATIC_SIM` | A simulation of the PRATIC moving-block network, with every failure mode injectable. | `SET BACKEND PRATIC_SIM` |
 | `PRATIC_HW`  | The real PRATIC network, supervised over a pluggable telemetry transport (with stubs for the physical link). | `SET BACKEND PRATIC_HW` |
 
