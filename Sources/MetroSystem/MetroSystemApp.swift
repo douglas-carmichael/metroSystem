@@ -107,6 +107,12 @@ struct MetroSystemApp: App {
         telnet.start()
         modbus.attach(world: world, network: network, telnet: telnet)
         modbus.start()
+        // Model-track hardware bridge: starts its output scan but stays
+        // DISABLED until the operator arms it (SET HARDWARE /ENABLE).
+        HardwareBridge.shared.attach(world: world)
+        // Backend selection (VAL / PRATIC_SIM / PRATIC_HW). VAL -- the
+        // world ticking its own physics, started above -- is the default.
+        BackendManager.shared.attach(world: world)
     }
 
     /// Looks for another running MetroSystem process on this Mac. A second

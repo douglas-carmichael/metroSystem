@@ -1046,6 +1046,59 @@ extension HelpLibrary {
 
     SET STANDARD {IEEE | EN62290 | AUTO}
 
+2 HARDWARE
+  Configures the model-track hardware link, which mirrors the locally-
+  owned rames onto physical model trains through a pluggable driver
+  (CONSOLE dry-run, JSONL generic TCP gateway, DCCEX command station --
+  SHOW HARDWARE lists what is registered). Qualifiers compose, so one
+  line can configure and arm the output. The output is always DISABLED
+  at launch and after /DISABLE a stop-all is sent to the layout.
+
+    SET HARDWARE /DRIVER=name         select the driver
+                 /HOST=host /PORT=n   TCP endpoint of the equipment
+                 /UNIT=(rame,unit)    map a rame to a hardware unit
+                 /UNIT=(rame)         clear the mapping
+                 /SCALE=x             throttle scale (0.05 .. 2.00)
+                 /RESYNC={ON|OFF}     canton sensors snap sim positions
+                 /CONNECT /DISCONNECT open / close the link
+                 /POWER={ON|OFF}      track power (driver permitting)
+                 /ENABLE /DISABLE     arm / stand down the output
+
+  Example -- drive a DCC-EX station and map rame 101 to cab 3:
+
+    SET HARDWARE /DRIVER=DCCEX /HOST=192.168.1.50 /PORT=2560
+    SET HARDWARE /UNIT=(101,3) /CONNECT /POWER=ON /ENABLE
+
+2 BACKEND
+  Switches the state backend the front end is a window onto: the
+  self-contained VAL simulation (the default), the simulated PRATIC
+  moving-block CBTC network, or the real PRATIC network supervised over
+  a telemetry transport. Switching replaces the locally-owned fleet;
+  trains owned by peer nodes are untouched.
+
+    SET BACKEND {VAL | PRATIC_SIM | PRATIC_HW}
+
+2 PRATIC
+  Dispatcher controls for the active PRATIC backend: movement-authority
+  restriction, target speed, delocalization recovery (re-reference a
+  train against a balise), turnouts, failure injection (simulated
+  backend only) and the telemetry transport (hardware backend only).
+
+    SET PRATIC /MA=(train,limit-m) | /MA=(train,OFF)
+               /TARGET=(train,m/s)
+               /RELOCALIZE=train | /RELOCALIZE=(train,balise)
+               /TURNOUT=(id,position)
+               /INJECT=COMMS:train | /INJECT=SENSOR:station
+               /RESTORE=COMMS:train | /RESTORE=SENSOR:station
+               /TRANSPORT={JSONL|SERIAL} /HOST=h /PORT=n
+               /CONNECT /DISCONNECT
+
+  Example -- exercise a delocalization and recover it:
+
+    SET PRATIC /INJECT=COMMS:201
+    SHOW PRATIC                       ! watch LINK then CONFIDENCE degrade
+    SET PRATIC /RELOCALIZE=(201,4)    ! re-reference against balise 4
+
 1 SHELVE
   Shelves an active SCADA alarm (ISA-18.2 SHLVD): the alarm is removed from
   the primary annunciator -- the beacon, the panel list and the active
@@ -1134,6 +1187,30 @@ extension HelpLibrary {
   addresses. The server listens on localhost port 5020.
 
     SHOW MODBUS
+
+2 HARDWARE
+  Displays the model-track hardware link: selected driver and link
+  state, endpoint, output arming, the rame-to-unit map, the registered
+  driver catalogue and the most recent layout sensor events. Configure
+  with SET HARDWARE.
+
+    SHOW HARDWARE
+
+2 BACKEND
+  Displays the available state backends (VAL simulation, PRATIC
+  simulation, PRATIC hardware) and which one is active, plus the
+  telemetry-transport health when a PRATIC backend is running.
+
+    SHOW BACKEND
+
+2 PRATIC
+  Displays the live PRATIC moving-block picture: every train's position
+  (loop and segment-relative), speed against its commanded profile,
+  limit of authority and its age, link status, position confidence and
+  uncertainty radius -- plus the wayside sensor stations, turnouts and
+  balise count. Requires an active PRATIC backend (SET BACKEND).
+
+    SHOW PRATIC
 
 2 TIME
   Displays the current date and time.

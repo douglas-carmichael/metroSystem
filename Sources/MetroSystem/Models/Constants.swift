@@ -42,6 +42,25 @@ enum Sim {
     static let tickHz: Double = 60.0
     static var tickInterval: Double { 1.0 / tickHz }
 
+    // PRATIC backends (Backends/): moving-block CBTC over the same loop.
+    static let praticScanHz: Double = 30.0            // sim / watchdog scan rate
+    static let praticSeedTrainCount: Int = 3
+    static let praticFirstTrainNumber: Int = 201      // labels distinct from VAL's 101+
+    static let praticSafetyMargin: Double = 30.0      // m moving-block envelope margin
+    static let praticLinkDegraded: Double = 1.0       // s of heartbeat silence -> DEGRADED
+    static let praticLinkLost: Double = 3.0           // s -> LOST
+    static let praticDelocalized: Double = 6.0        // s -> DELOCALIZED
+    static let praticUncertaintyGrowth: Double = 0.05 // m of uncertainty per m travelled
+    static let praticDelocThreshold: Double = 40.0    // m of uncertainty -> DELOCALIZED
+    static let praticBaliseTolerance: Double = 1.5    // m window for a balise fix
+    static let praticDefaultPort: UInt16 = 4800       // JSONL transport default
+
+    // Model-track hardware bridge (Hardware/HardwareBridge.swift).
+    static let hardwareOutputHz: Double = 10.0          // output-scan rate
+    static let hardwareRefreshInterval: Double = 1.0    // full-frame resend period (s)
+    static let hardwareSpeedSteps: Int = 126            // DCC-style throttle quantisation
+    static let hardwareSensorLogDepth: Int = 8          // SHOW HARDWARE event ring
+
     // Peer networking (app <-> app, app <-> ClusterDaemon nodes).
     static let bonjourServiceType: String = "_metrosys._tcp"
     /// Periodic rebroadcast cadence for locally-owned rame state. Operator
