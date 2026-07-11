@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// A dedicated per-rame status screen, opened from the PCC dispatcher
-/// (double-click a train card's DETAIL button). Mirrors the DC CBTC
-/// "train detail" TCMS synoptic in the retro VT320 phosphor aesthetic: a
+/// (double-click a train card's DETAIL button). A "train detail" TCMS
+/// synoptic in the retro VT320 phosphor aesthetic: a
 /// live gauge cluster (speed dial with the asservissement setpoint needle,
 /// movement-authority bar, passenger and traction meters), the diagnostic
 /// status sections, the ATP / chaîne-de-sécurité contact block, the
@@ -475,7 +475,7 @@ private struct AuxiliarySection: View {
 
 // MARK: - Auxiliary controls (owner-driven telecommands)
 
-/// The DC CBTC train-detail auxiliary controls: DELESTAGE BT and the other
+/// The train-detail auxiliary controls: DELESTAGE BT and the other
 /// subsystem toggles plus the momentary telecommands (RAZ MULTIMEDIA, ACQUIT
 /// COMPTEUR FU, …). Every action routes through `MetroWorld.mutate`, so the
 /// block is live only for a locally-owned rame; on a REMOTE rame the controls
@@ -592,8 +592,8 @@ private struct AuxControlButton: View {
 
 // MARK: - Electrical system diagram (synoptic)
 
-/// The rame's low-voltage electrical synoptic, after the DC CBTC auxiliary
-/// diagram: the two 750 V third-rail shoes feeding the bus, the static
+/// The rame's low-voltage electrical synoptic: the two 750 V third-rail
+/// shoes feeding the bus, the static
 /// converter (CVS) and motor-alternator/compressor group, the battery, and
 /// the DELESTAGE BT contact that visibly opens when load shedding is engaged,
 /// dropping the lighting and ventilation loads. Node labels localise EN / FR.
@@ -784,9 +784,8 @@ private struct DiagLamp: View {
 
 // MARK: - Subsystem drill-down
 
-/// The subsystems reachable by clicking a node on the electrical synoptic,
-/// mirroring the DC CBTC auxiliary-view drill-down. Each produces its own
-/// screen of readouts.
+/// The subsystems reachable by clicking a node on the electrical synoptic.
+/// Each produces its own screen of readouts.
 private enum Subsystem: String, Identifiable {
     case pickup, cvs, compressor, battery, delestage, lighting, ventilation
     var id: String { rawValue }

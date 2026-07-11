@@ -132,8 +132,8 @@ struct Train: Identifiable, Hashable, Codable {
     var targetTemperature: Double = 22.0       // HVAC setpoint
     var brakeBoxTemperature: Double = 35.0     // TEMP COFFRE-FREIN (°C)
 
-    // Auxiliary control states -- owner-driven telecommands mirrored from the
-    // DC CBTC train-detail screen. Toggled through `MetroWorld.mutate` and
+    // Auxiliary control states -- owner-driven telecommands shown on the
+    // train-detail screen. Toggled through `MetroWorld.mutate` and
     // carried on the peer wire so a rame's synoptic reads the same everywhere.
     var isLoadSheddingActive: Bool = false     // DELESTAGE BT
     var areLightsOn: Bool = true               // ECLAIRAGE
@@ -240,8 +240,8 @@ struct Train: Identifiable, Hashable, Codable {
     var signedSpeed: Double { speed * travelDirection.rawValue }
 
     /// DELESTAGE BT: shedding the low-voltage load dims the lighting circuit
-    /// and drops non-vital ventilation (the coupling the DC CBTC detail
-    /// screen shows when load shedding is engaged); releasing it restores
+    /// and drops non-vital ventilation (the coupling the detail screen
+    /// shows when load shedding is engaged); releasing it restores
     /// nominal lighting and ventilation.
     mutating func setLoadShedding(_ on: Bool) {
         isLoadSheddingActive = on
