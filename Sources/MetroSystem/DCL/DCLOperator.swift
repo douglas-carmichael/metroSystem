@@ -151,7 +151,7 @@ extension DCLEngine {
         let stripped = target.hasSuffix(".EXE") ? String(target.dropLast(4)) : target
         let knownDiagnostic: Bool
         switch stripped {
-        case "FREIN_TEST", "PORTES_TEST", "PNEU_CAL", "QUAI_LAMP_TEST":
+        case "FREIN_TEST", "PORTES_TEST", "PNEU_CAL", "QUAI_LAMP_TEST", "LRU_LOOKUP":
             knownDiagnostic = true
         default:
             knownDiagnostic = false
@@ -166,6 +166,7 @@ extension DCLEngine {
         case "PORTES_TEST":     startPortesTest()
         case "PNEU_CAL":        startPneuCal()
         case "QUAI_LAMP_TEST":  startQuaiLampTest()
+        case "LRU_LOOKUP":      startLRULookup()
         default: break
         }
         return ""

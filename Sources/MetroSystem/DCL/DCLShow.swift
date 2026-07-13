@@ -814,6 +814,8 @@ extension DCLEngine {
         s += tr("login.lpd.pneu") + "\n"
         s += "    " + "QUAI_LAMP_TEST".padding(toLength: 16, withPad: " ", startingAt: 0)
         s += tr("login.lpd.quai") + "\n"
+        s += "    " + "LRU_LOOKUP".padding(toLength: 16, withPad: " ", startingAt: 0)
+        s += tr("login.lpd.lru") + "\n"
         s += "\nLaunch with    RUN <image>    or    DIAGNOSE    for an interactive menu.\n"
         return s
     }

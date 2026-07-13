@@ -350,6 +350,41 @@ extension DCLEngine {
                          steps: steps)
     }
 
+    /// LRU_LOOKUP -- walk every locally-owned rame's latched faults and
+    /// EB cause and report the suspect board(s) in the STS rack
+    /// nomenclature (Attachment A of the O'Hare maintenance contract):
+    /// the board-swap maintenance model as a diagnosable exercise. Rames
+    /// with nothing latched report clean.
+    func startLRULookup() {
+        let pass = tr("diag.status.pass")
+        let attention = tr("diag.status.attention")
+        let clean = tr("diag.lru.clean")
+        var steps: [TestStep] = []
+        for train in (world?.locallyOwned() ?? []) {
+            let entity = String(format: tr("diag.entity.rame"), train.label)
+            let suspects = VALFaultLRU.suspects(for: train)
+            if suspects.isEmpty {
+                steps.append(TestStep(label: diagEntity(entity, width: diagRameEntityWidth) + tr("diag.lru.scan")) {
+                    Thread.sleep(forTimeInterval: 0.1)
+                    return (clean, pass)
+                })
+            } else {
+                for suspect in suspects {
+                    steps.append(TestStep(label: diagEntity(entity, width: diagRameEntityWidth) + suspect.point) {
+                        Thread.sleep(forTimeInterval: 0.1)
+                        return (suspect.lru, attention)
+                    })
+                }
+            }
+        }
+        steps.append(TestStep(label: tr("diag.step.lru.reference")) {
+            ("STS ATT.A", pass)
+        })
+        startTestUtility(name: tr("diag.test.lru"),
+                         header: diagHeader("diag.col.rame", width: diagRameEntityWidth),
+                         steps: steps)
+    }
+
     // MARK: -- diagnostic test selection menu (DECforms-style)
 
     /// Pop a full-screen menu that lets the operator pick one of the
@@ -383,7 +418,10 @@ extension DCLEngine {
                          runner: { [weak self] in self?.startPneuCal() }),
             DiagMenuItem(image: "QUAI_LAMP_TEST",
                          description: descOf("login.lpd.quai", image: "QUAI_LAMP_TEST"),
-                         runner: { [weak self] in self?.startQuaiLampTest() })
+                         runner: { [weak self] in self?.startQuaiLampTest() }),
+            DiagMenuItem(image: "LRU_LOOKUP",
+                         description: descOf("login.lpd.lru", image: "LRU_LOOKUP"),
+                         runner: { [weak self] in self?.startLRULookup() })
         ]
         diagMenuSelection = 0
         liveMode = .diagnosticMenu

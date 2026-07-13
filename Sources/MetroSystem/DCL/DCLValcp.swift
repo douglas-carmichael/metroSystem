@@ -143,6 +143,13 @@ extension DCLEngine {
         s += tr("valcp.rame.nextstop")  + t.nextStationName + "\n"
         s += String(format: "%@%6.0f V   %@%7.0f A\n", tr("valcp.rame.voltage"), t.mainVoltage,
                     tr("valcp.rame.traction"), t.tractionCurrent)
+        // Traction-chain bench line (VAL backend): the quantities a
+        // maintenance bench reads, in the thesis notation.
+        if !t.speedProgram.isEmpty {
+            s += String(format: tr("valcp.rame.chain") + "\n",
+                        t.armatureCurrent, t.lineCurrent,
+                        t.excitationCurrent, t.modulationRatio * 100)
+        }
         s += tr("valcp.rame.faults")    + faultStr + "\n"
         // Tire block: eight positions, VMS-table style.
         s += tr("valcp.rame.tires")

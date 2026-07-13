@@ -212,6 +212,12 @@ struct Train: Identifiable, Codable {
     var isCompressorRunning: Bool = false
     var interiorTemperature: Double = 22.0
 
+    // Traction-chain bench telemetry (mirror of the app's fields).
+    var armatureCurrent: Double = 0
+    var lineCurrent: Double = 0
+    var excitationCurrent: Double = 0
+    var modulationRatio: Double = 0
+
     enum CodingKeys: String, CodingKey {
         case id, label, ownerPeerId, position, speed, acceleration
         case targetSpeed, movementAuthority, travelDirection, status, mode
@@ -227,6 +233,7 @@ struct Train: Identifiable, Codable {
         case kacopSecondsSinceAck, kacopWarning
         case mainVoltage, batteryVoltage, tractionCurrent, tractionTorque
         case compressorPressure, isCompressorRunning, interiorTemperature
+        case armatureCurrent, lineCurrent, excitationCurrent, modulationRatio
     }
 
     init(id: UUID, label: String, ownerPeerId: String, position: Double) {
@@ -290,5 +297,9 @@ struct Train: Identifiable, Codable {
         compressorPressure = try c.decodeIfPresent(Double.self, forKey: .compressorPressure) ?? 8.5
         isCompressorRunning = try c.decodeIfPresent(Bool.self, forKey: .isCompressorRunning) ?? false
         interiorTemperature = try c.decodeIfPresent(Double.self, forKey: .interiorTemperature) ?? 22.0
+        armatureCurrent = try c.decodeIfPresent(Double.self, forKey: .armatureCurrent) ?? 0
+        lineCurrent = try c.decodeIfPresent(Double.self, forKey: .lineCurrent) ?? 0
+        excitationCurrent = try c.decodeIfPresent(Double.self, forKey: .excitationCurrent) ?? 0
+        modulationRatio = try c.decodeIfPresent(Double.self, forKey: .modulationRatio) ?? 0
     }
 }

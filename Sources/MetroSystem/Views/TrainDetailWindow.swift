@@ -353,6 +353,22 @@ private struct TractionSection: View {
             VStack(alignment: .leading, spacing: 6) {
                 ValueRow(label: language.t("detail.traction.current"),
                          value: String(format: "%.0f A", train.tractionCurrent))
+                // Bench view of the chain (VAL backend): the chopper
+                // relationship il = mhi x ii, and the image-série field
+                // ratio -- what a maintenance bench verifies. II/IL/IEX/
+                // MHI are the thesis symbols, identical in both languages.
+                if !train.speedProgram.isEmpty {
+                    ValueRow(label: language.t("detail.traction.armature"),
+                             value: String(format: "%.0f A", train.armatureCurrent))
+                    ValueRow(label: language.t("detail.traction.line"),
+                             value: String(format: "%+.0f A", train.lineCurrent),
+                             color: train.lineCurrent < -1 ? RetroTheme.cyan : RetroTheme.amberBright)
+                    ValueRow(label: language.t("detail.traction.field"),
+                             value: String(format: "%.1f A", train.excitationCurrent))
+                    ValueRow(label: language.t("detail.traction.duty"),
+                             value: String(format: "%.0f %%", train.modulationRatio * 100),
+                             color: train.modulationRatio >= 0.99 ? RetroTheme.amberBright : RetroTheme.amber)
+                }
                 ValueRow(label: language.t("detail.traction.torque"),
                          value: String(format: "%+.0f %%", train.tractionTorque),
                          color: train.tractionTorque >= 0 ? RetroTheme.green : RetroTheme.cyan)
@@ -438,6 +454,13 @@ private struct ATPSection: View {
                        let cause = VALTripCause(rawValue: train.ebCause), cause != .none {
                         ValueRow(label: language.t("detail.atp.ebcause"),
                                  value: cause.mnemonic, color: .red)
+                        // Maintenance pointer: the suspect boards for
+                        // this trip, in the STS rack nomenclature.
+                        if !cause.suspectLRU.isEmpty {
+                            ValueRow(label: language.t("detail.atp.lru"),
+                                     value: cause.suspectLRU,
+                                     color: RetroTheme.cyan)
+                        }
                     }
                 }
             }

@@ -406,6 +406,14 @@ extension HelpLibrary {
     $ VALCP SET LIGNE /SP=(1,3,60)   ! shuttle CHU <-> Gare, 60 s headway
     $ VALCP SET LIGNE /NORMAL        ! full-line service restored
 
+  Self-paced maintenance exercises (each sets up its own scenario and
+  prints the expected observations -- no instructor station needed):
+
+    $ @TP1     ! traction-chain bench reading (II/IL/IEX/MHI)
+    $ @TP2     ! EB-trip diagnosis down to the suspect board (LRU)
+    $ @TP3     ! adhesion and the anti-skid function
+    $ TYPE TP1.COM                   ! read an exercise before running it
+
 1 EXAMINE
   Displays the contents of memory. The value at the given virtual
   address is shown as a longword.
@@ -902,6 +910,15 @@ extension HelpLibrary {
   station of the line.
 
     RUN QUAI_LAMP_TEST
+
+2 LRU_LOOKUP
+  Walks every locally-owned rame's latched faults and FU cause and
+  reports the suspect line-replaceable unit(s) -- rack and board
+  designators from the STS parts list (OBCU DRIVE/SAFETY/TMTC racks,
+  WCU, console A22). VAL maintenance is board-swap maintenance: the
+  lookup turns an injected fault into a diagnosable exercise.
+
+    RUN LRU_LOOKUP
 
 1 SCRIPTING
   An overview of the DCL command-procedure language. Every command line

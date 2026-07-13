@@ -290,7 +290,7 @@ extension DCLEngine {
             "RENAME A.TXT B.TXT", "APPEND A.TXT B.TXT",
             "EDIT FILE.TXT", "DIFFERENCES A.TXT B.TXT",
             "RUN PROG.EXE", "RUN FREIN_TEST", "RUN PORTES_TEST",
-            "RUN PNEU_CAL", "RUN QUAI_LAMP_TEST",
+            "RUN PNEU_CAL", "RUN QUAI_LAMP_TEST", "RUN LRU_LOOKUP",
             "ANALYZE/ERROR_LOG", "ANALYZE/AUDIT", "ANALYZE/IMAGE",
             "INITIALIZE DKA0:",
             "MOUNT DKA0:", "MOUNT MUA0: METRO_BACKUP",

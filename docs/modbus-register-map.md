@@ -97,6 +97,15 @@ Per-train telemetry:
 | `128..143` | VAL speed program (0 = SF-N normal, 1 = PP perturbed, 2 = SFA arrival, 3 = SFB departure, 4 = HOLD, 5 = ASMD, 6 = ABSENT; `0xFFFF` = not VAL-driven) |
 | `144..159` | KACOP seconds since acknowledge ×10 |
 
+Traction-chain bench block (VAL backend; zero under the other backends):
+
+| Address | Meaning |
+| --- | --- |
+| `160..175` | Armature current **II** (A, per-car loop) |
+| `176..191` | Line current **IL**, signed Int16 (A; negative = regenerating into the line) |
+| `192..207` | Field current **IEX** ×10 (A per motor) |
+| `208..223` | Chopper duty **MHI** ×1000 (`0..1000`) |
+
 Line-wide scalars (base `1000`):
 
 | Address | Meaning |

@@ -217,6 +217,8 @@ enum Strings {
                                 "  RUN PNEU_CAL         Calibration pression pneus (8 positions)")
         add("login.lpd.quai",   "  RUN QUAI_LAMP_TEST   Platform display and lamp test",
                                 "  RUN QUAI_LAMP_TEST   Test des afficheurs et lampes de quai")
+        add("login.lpd.lru",    "  RUN LRU_LOOKUP       Suspect-board lookup for latched faults (STS list)",
+                                "  RUN LRU_LOOKUP       Cartes suspectes pour les défauts mémorisés (liste STS)")
         add("login.lpd.help",   "Type HELP METRO for a worked example, HELP VALCP for the reference.",
                                 "Tapez HELP METRO pour un exemple, HELP VALCP pour la référence.")
 
@@ -392,6 +394,13 @@ enum Strings {
         add("detail.sec.pupitre",   "MANUAL DRIVING -- CONSOLE A22",       "CONDUITE MANUELLE -- PUPITRE A22")
         add("detail.atp.program",   "Speed program",                       "Programme de vitesse")
         add("detail.atp.ebcause",   "EB cause",                            "Cause FU")
+        add("detail.atp.lru",       "Suspect LRU",                         "Carte suspecte")
+        // Traction-chain bench rows (II / IL / IEX / MHI are the thesis
+        // symbols -- identifiers, identical in both modes).
+        add("detail.traction.armature","Armature current (II)",            "Courant d'induit (II)")
+        add("detail.traction.line", "Line current (IL)",                   "Courant de ligne (IL)")
+        add("detail.traction.field","Field current (IEX)",                 "Courant d'excitation (IEX)")
+        add("detail.traction.duty", "Chopper duty (MHI)",                  "Rapport de modulation (MHI)")
         // Cab voyants whose markings translate per the domain-acronym
         // convention (FR PM/URG <-> EN MAN/EB); TRAC, KACOP, KG are
         // identical in both modes.
@@ -909,6 +918,8 @@ enum Strings {
         // VALCP SHOW RAME rows (VAL fixed-block telemetry).
         add("valcp.rame.program",   "  Speed program:  ",                  "  Programme :     ")
         add("valcp.rame.ebcause",   "EB cause:",                           "cause FU :")
+        add("valcp.rame.chain",     "  Traction chain: II %4.0f A   IL %+5.0f A   IEX %4.1f A   MHI %3.0f%%",
+                                    "  Chaîne traction: II %4.0f A   IL %+5.0f A   IEX %4.1f A   MHI %3.0f %%")
         add("valcp.rame.pupitre",   "  Console A22:    KG %@   reverser %@   lever %+.0f%%   KACOP %.1f s",
                                     "  Pupitre A22 :   KG %@   inverseur %@   manip. %+.0f %%   KACOP %.1f s")
         add("valcp.rame.pneu.range","%%SET-W-IVPNEU, tire index must be 1..%d\n",
@@ -937,6 +948,7 @@ enum Strings {
         add("diag.status.pass",     "PASS",                                "CONFORME")
         add("diag.status.ok",       "OK",                                  "OK")
         add("diag.status.fail",     "FAIL",                                "DÉFAUT")
+        add("diag.status.attention","ATTENTION",                           "ATTENTION")
         add("diag.step.of",         "Step %d of %d",                       "Étape %d sur %d")
         add("diag.complete",        "Complete: %d/%d",                     "Terminé : %d/%d")
         add("diag.allpass",         "ALL TESTS PASS",                      "TOUS LES TESTS CONFORMES")
@@ -947,6 +959,12 @@ enum Strings {
         add("diag.test.portes",     "PORTES_TEST -- door cycle + interlock","PORTES_TEST -- cycle portes + asservissement")
         add("diag.test.pneu",       "PNEU_CAL -- tire-pressure calibration","PNEU_CAL -- calibration pression pneus")
         add("diag.test.quai",       "QUAI_LAMP_TEST -- platform lamp test", "QUAI_LAMP_TEST -- test lampes de quai")
+        // LRU lookup (board-swap maintenance model; board designators are
+        // identifiers from the STS parts list).
+        add("diag.test.lru",        "LRU_LOOKUP -- suspect-board lookup",  "LRU_LOOKUP -- recherche de cartes suspectes")
+        add("diag.lru.clean",       "no latched fault",                    "aucun défaut mémorisé")
+        add("diag.lru.scan",        "fault scan",                          "balayage des défauts")
+        add("diag.step.lru.reference","Parts-list reference",              "Référence liste de pièces")
         add("diag.step.frein.rame", "brake chain",                         "chaîne de freinage")
         add("diag.step.frein.fw",   "Brake controller firmware",           "Micrologiciel du contrôleur de frein")
         add("diag.step.portes.cycle","door cycle",                         "cycle des portes")

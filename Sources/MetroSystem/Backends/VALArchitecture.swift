@@ -91,6 +91,51 @@ enum VALTripCause: String, Codable {
         case .operatorFU:       return "FU-CDE"
         }
     }
+
+    /// Suspect line-replaceable unit(s) for the trip, in the STS parts
+    /// list's rack/board nomenclature (Attachment A of the O'Hare
+    /// maintenance contract). Board designators are identifiers --
+    /// identical in both languages, like the SCADA point tags. Empty when
+    /// the cause is an operator action, not a fault.
+    var suspectLRU: String {
+        switch self {
+        case .none, .operatorFU:
+            return ""
+        case .overspeed:        return "SAFETY RACK: SSV / RLS V-A"
+        case .sfLoss:           return "SAFETY RACK: CPFS-A · WCU: AFSC/PP"
+        case .blockPenetration: return "WCU: INTUSA / DCIS"
+        case .rollback:         return "SAFETY RACK: MASV"
+        case .ppOverrun:        return "SAFETY RACK: CPPP-A"
+        case .doorUnlocked:     return "DRIVE RACK: ILTE (train line)"
+        case .vigilance:        return "CONSOLE A22: KACOP loop"
+        case .doorFault:        return "DRIVE RACK: ILTE · DOOR CONTROL UNIT"
+        case .brakeFault:       return "TRACTION SAFETY RACK: APEP / ESSCT"
+        case .lineEmergency:    return "WCU: SF withdrawal (line-wide)"
+        case .controllerAlarm:  return "PCC: CC watchdog / DTU"
+        }
+    }
+}
+
+/// Suspect LRUs for the latched fault flags and adhesion conditions --
+/// the injectable failures that don't necessarily trip the FU. Same
+/// nomenclature and language-neutrality as `VALTripCause.suspectLRU`.
+enum VALFaultLRU {
+    static func suspects(for train: Train) -> [(point: String, lru: String)] {
+        var rows: [(String, String)] = []
+        if train.isDoorFault   { rows.append(("PORTES",    "DRIVE RACK: ILTE · DOOR CONTROL UNIT")) }
+        if train.isEngineFault { rows.append(("TRACTION",  "DRIVE RACK: REG-A · GTO PANEL 3A6/3A7")) }
+        if train.isBrakeFault  { rows.append(("FREIN",     "TRACTION SAFETY RACK: APEP / ESSCT")) }
+        if train.isSignalFault { rows.append(("CTC_RADIO", "TMTC RACK: MP 68 KE · ANTENNA REA")) }
+        if train.isPatinage    { rows.append(("PATINAGE",  "DRIVE RACK: ASST-A · running gear")) }
+        if train.isEnrayage    { rows.append(("ENRAYAGE",  "TRACTION SAFETY RACK: APEP · running gear")) }
+        if train.worstTire != .ok { rows.append(("PNEU",   "RUNNING GEAR: tire set (PNEU_CAL)")) }
+        if train.isEmergencyBrakeApplied,
+           let cause = VALTripCause(rawValue: train.ebCause),
+           !cause.suspectLRU.isEmpty {
+            rows.append((cause.mnemonic, cause.suspectLRU))
+        }
+        return rows
+    }
 }
 
 /// One fixed block of the guideway database, with its encoded speed
@@ -265,4 +310,11 @@ struct VALTractionState {
     /// process alarms when not operator-injected).
     var slipping: Bool = false
     var sliding: Bool = false
+
+    /// Bench telemetry (thesis notation): the actual electrical picture
+    /// backed out of the force demand each scan.
+    var benchArmature: Double = 0   // ii, A -- per-car armature loop
+    var benchLine: Double = 0       // il, A signed (negative = regen return)
+    var benchField: Double = 0      // iex, A per motor
+    var benchDuty: Double = 0       // mhi, 0...1
 }

@@ -157,6 +157,29 @@ unchanged as the **`CBTC_SIM`** backend (`Backends/CBTCSimBackend.swift`)
   `SET RAME /KG= /REVERSER= /LEVER= /KACOP` in DCL (FR: `/INVERSEUR`,
   `/MANIPULATEUR`); Modbus coils 64..111 and holding registers 32..63.
 
+## Maintenance-training surfaces
+
+- **Bench telemetry** (thesis notation): the actual armature current
+  `II`, line current `IL` (signed — negative while regenerating),
+  field current `IEX` and chopper duty `MHI` are backed out of the
+  force demand each scan and published on the wire
+  (`Train.armatureCurrent/lineCurrent/excitationCurrent/
+  modulationRatio`). Shown in the detail window's TRACTION section and
+  `VALCP SHOW RAME`'s "Traction chain" line; polled over Modbus input
+  registers 160..223. The chopper relationship `IL = MHI × II`, the
+  image-série ratio change at base speed (0.059 → 0.034) and the FU
+  cutting traction power are all directly observable.
+- **LRU lookup** (`RUN LRU_LOOKUP`, also on the DIAGNOSE menu): maps
+  every locally-owned rame's latched faults and EB cause to the suspect
+  board(s) in the STS parts-list nomenclature — the board-swap
+  maintenance model of the O'Hare contract. The detail window's ATP
+  section shows the same suspect line while an FU is in.
+- **Self-paced exercises** `TP1..TP3.COM` seeded in the COM store
+  (`@TP1` — bench reading; `@TP2` — EB-trip diagnosis to the board;
+  `@TP3` — adhesion/anti-skid). Each sets up its own scenario, prints
+  bilingual instructions and the expected observations for self-check,
+  and never needs an instructor station or a second node.
+
 ## Deliberate simplifications
 
 - One berth per station, no switches: the loop has no diverging routes,

@@ -70,6 +70,12 @@ import Network
 ///                           3=SFB, 4=HOLD, 5=ASMD, 6=ABSENT;
 ///                           0xFFFF = not VAL-driven)
 ///     144..159 Rame[0..15]  KACOP seconds since acknowledge x10
+///   -- Traction-chain bench block (VAL backend; zero otherwise):
+///     160..175 Rame[0..15]  Armature current II (A, per-car loop)
+///     176..191 Rame[0..15]  Line current IL, signed Int16 (A;
+///                           negative = regenerating into the line)
+///     192..207 Rame[0..15]  Field current IEX x10 (A per motor)
+///     208..223 Rame[0..15]  Chopper duty MHI x1000 (0..1000)
 ///     1000    Number of rames known (local + remote)
 ///     1001    Number of remote peers connected
 ///     1002    Canton count
@@ -129,13 +135,14 @@ final class ModbusTCPServer: ObservableObject {
     static let maxTrains: Int = 16
     /// Number of per-rame input-register fields (position, speed, consigne,
     /// MA, pax, status, canton, worst tire, VAL speed program, KACOP
-    /// timer). The rame-indexed IR block therefore spans
+    /// timer, and the traction-chain bench block II/IL/IEX/MHI). The
+    /// rame-indexed IR block therefore spans
     /// `0 ..< irTrainFieldCount * maxTrains`; the line-wide scalar
     /// registers live above it at `scalarBase`.
-    static let irTrainFieldCount: Int = 10
+    static let irTrainFieldCount: Int = 14
     /// First address of the line-wide scalar input registers. Placed at a
     /// round 1000, well clear of the rame-indexed block
-    /// (`irTrainFieldCount * maxTrains = 160`).
+    /// (`irTrainFieldCount * maxTrains = 224`).
     static let scalarBase: Int = 1000
     /// How long the MODBUS status indicator holds "connected" after the last
     /// live socket closes.
@@ -655,6 +662,15 @@ final class ModbusClient {
                 }
             case 9:                                 // KACOP timer x10 (s)
                 return UInt16(max(0, min(0xFFFF, Int(t.kacopSecondsSinceAck * 10.0))))
+            case 10:                                // armature current II (A)
+                return UInt16(max(0, min(0xFFFF, Int(t.armatureCurrent))))
+            case 11:                                // line current IL, signed (A)
+                let il = max(-32768, min(32767, Int(t.lineCurrent)))
+                return UInt16(bitPattern: Int16(il))
+            case 12:                                // field current IEX x10 (A)
+                return UInt16(max(0, min(0xFFFF, Int(t.excitationCurrent * 10.0))))
+            case 13:                                // chopper duty MHI x1000
+                return UInt16(max(0, min(1000, Int(t.modulationRatio * 1000.0))))
             default:
                 return 0
             }

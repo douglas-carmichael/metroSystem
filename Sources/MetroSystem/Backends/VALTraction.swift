@@ -103,8 +103,8 @@ final class VALTractionChain {
         }
 
         // ----- electrical telemetry -------------------------------------
-        publishElectrical(&train, ts: ts, demand: demand, applied: applied,
-                          speed: train.speed, dt: dt)
+        publishElectrical(&train, ts: &ts, demand: demand, applied: applied,
+                          speed: train.speed, emergency: request.emergencyBrake)
     }
 
     // MARK: -- image série traction curve
@@ -287,36 +287,64 @@ final class VALTractionChain {
         Sim.davisA * mass + Sim.davisB * v + Sim.davisC * v * v
     }
 
-    private func publishElectrical(_ train: inout Train, ts: VALTractionState,
+    /// The bench picture of the chain (thesis Ch. 1 notation): from the
+    /// actual force demand, back out the per-car armature loop current
+    /// ii, the field current iex = ratio.ii of the image-série strategy
+    /// (full field 0.059 until the loop voltage hits the filter ceiling,
+    /// then 0.034; regeneration never weakens the field, DOT §3.2.6),
+    /// the chopper modulation ratio mhi, and the line current
+    /// il = mhi.ii per car -- the buck-converter relationship a
+    /// maintenance bench verifies. Under FU the traction power is
+    /// removed, so the whole electrical picture drops to auxiliaries.
+    private func publishElectrical(_ train: inout Train, ts: inout VALTractionState,
                                    demand: Double, applied: Double,
-                                   speed: Double, dt: Double) {
-        let motoring = demand > 500
-        let braking = demand < -500
-        if motoring {
-            let ii = ts.armatureCurrent.reduce(0, +)
-            // Scale the displayed line current with the actual effort share.
-            let cap = tractiveCapabilityDisplay(ts: ts)
-            let share = cap > 0 ? min(1, demand / cap) : 0
-            train.tractionCurrent = max(60, ii * share)
-            train.mainVoltage = Sim.lineVoltage - train.tractionCurrent * 0.02
-        } else if braking && speed > Sim.regenMinSpeed {
-            // Regeneration lifts the line a little (receptivity-limited).
-            let regen = min(400, abs(demand) / 100) * Sim.regenReceptivity
-            train.tractionCurrent = regen
-            train.mainVoltage = min(825, Sim.lineVoltage + regen * 0.15)
+                                   speed: Double, emergency: Bool) {
+        let motoring = demand > 500 && !emergency
+        let regenerating = demand < -500 && speed > Sim.regenMinSpeed && !emergency
+
+        if motoring || regenerating {
+            let omega = motorSpeed(at: speed)
+            // Per-car force -> torque per motor (two series motors, one
+            // per bogie, each through differential x reducer).
+            let torquePerMotor = (abs(demand) / 2) * Sim.wheelRadius / (2 * Sim.gearRatio)
+            var ratio = Sim.imageSerieFullField
+            var ii = (torquePerMotor / (Sim.motorTorquePerAmp2 * ratio)).squareRoot()
+            if motoring {
+                let loop = 2 * Sim.motorTorquePerAmp2 * ratio * ii * omega
+                    + ii * Sim.armatureResistance
+                if loop > Sim.lineVoltage {
+                    ratio = Sim.imageSerieWeakField
+                    ii = (torquePerMotor / (Sim.motorTorquePerAmp2 * ratio)).squareRoot()
+                }
+            }
+            ii = min(ii, Sim.armatureCurrentMax)
+            let duty = min(1, max(0,
+                (2 * Sim.motorTorquePerAmp2 * ratio * ii * omega + ii * Sim.armatureResistance)
+                    / Sim.lineVoltage))
+            ts.benchArmature = ii
+            ts.benchField = ratio * ii
+            ts.benchDuty = duty
+            // Chopper input current, both cars; negative = returned to
+            // the line (receptivity-limited).
+            ts.benchLine = 2 * duty * ii * (motoring ? 1 : -Sim.regenReceptivity)
+
+            train.tractionCurrent = max(60, 2 * ii)
+            train.mainVoltage = motoring
+                ? Sim.lineVoltage - abs(ts.benchLine) * 0.02
+                : min(825, Sim.lineVoltage + abs(ts.benchLine) * 0.15)
         } else {
+            ts.benchArmature = 0
+            ts.benchField = 0
+            ts.benchDuty = 0
+            ts.benchLine = 0
             train.tractionCurrent = 40
             train.mainVoltage = Sim.lineVoltage - 0.8
         }
+        train.armatureCurrent = ts.benchArmature
+        train.lineCurrent = ts.benchLine
+        train.excitationCurrent = ts.benchField
+        train.modulationRatio = ts.benchDuty
         train.tractionTorque = max(-100, min(100,
             applied / (Sim.tareMass * Sim.maxAcceleration) * 100))
-    }
-
-    private func tractiveCapabilityDisplay(ts: VALTractionState) -> Double {
-        let ii = ts.armatureCurrent.first ?? 0
-        let ratio = (ts.fieldWeakened.first ?? false)
-            ? Sim.imageSerieWeakField : Sim.imageSerieFullField
-        let torque = Sim.motorTorquePerAmp2 * ratio * ii * ii
-        return Double(Sim.motorCount) * torque * Sim.gearRatio / Sim.wheelRadius
     }
 }

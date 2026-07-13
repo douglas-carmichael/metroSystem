@@ -165,6 +165,112 @@ final class DCLScriptStore {
         $ WRITE SYS$OUTPUT "Returned rame 101 to conduite automatique."
         $ EXIT
         """)
+        // Self-paced training exercises (TP -- travaux pratiques). Each
+        // sets up its own scenario, states the objective, and points at
+        // the verification tools, with the expected result printed so the
+        // student self-checks -- no instructor console or second node is
+        // ever required. Output lines carry EN and FR so either interface
+        // language is served (script bodies are plain files, not the
+        // localisation table).
+        seed(name: "TP1.COM", body: """
+        $ ! TP1.COM -- Traction-chain bench reading
+        $ !            Lecture de la chaine de traction au banc
+        $ WRITE SYS$OUTPUT "=== TP1: TRACTION CHAIN BENCH READING ==="
+        $ WRITE SYS$OUTPUT "=== TP1: LECTURE DE LA CHAINE DE TRACTION ==="
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Goal: relate the chopper quantities II, IL, IEX and MHI."
+        $ WRITE SYS$OUTPUT "But : relier les grandeurs hacheur II, IL, IEX et MHI."
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Rame 101: manual driving, KG on, reverser AV, 80% traction."
+        $ WRITE SYS$OUTPUT "Rame 101 : conduite manuelle, KG, inverseur AV, traction 80 %."
+        $ VALCP SET RAME 101 /MANUAL
+        $ VALCP SET RAME 101 /KG=ON
+        $ VALCP SET RAME 101 /REVERSER=AV
+        $ VALCP SET RAME 101 /LEVER=80
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "1. Open the rame's DETAIL window, TRACTION section."
+        $ WRITE SYS$OUTPUT "   Ouvrez la fenetre DETAIL de la rame, section TRACTION."
+        $ WRITE SYS$OUTPUT "2. Launch: II holds its limit while MHI climbs -- the chopper"
+        $ WRITE SYS$OUTPUT "   relation is IL = MHI x II (a buck converter)."
+        $ WRITE SYS$OUTPUT "   Lancement : II reste a sa limite pendant que MHI monte --"
+        $ WRITE SYS$OUTPUT "   la relation hacheur est IL = MHI x II (hacheur serie)."
+        $ WRITE SYS$OUTPUT "3. When MHI saturates (100%), note the speed: base speed."
+        $ WRITE SYS$OUTPUT "   IEX/II drops 0.059 -> 0.034: field weakening."
+        $ WRITE SYS$OUTPUT "   Quand MHI sature (100 %), notez la vitesse : vitesse de"
+        $ WRITE SYS$OUTPUT "   base. IEX/II passe de 0,059 a 0,034 : defluxage."
+        $ WRITE SYS$OUTPUT "4. Acknowledge KACOP within 14 s: SET RAME 101 /KACOP"
+        $ WRITE SYS$OUTPUT "   Acquittez le KACOP sous 14 s : SET RAME 101 /KACOP"
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Verify any time / Verifiez a tout moment : VALCP SHOW RAME 101"
+        $ WRITE SYS$OUTPUT "Finish / Terminer :  @TP1_FIN"
+        $ EXIT
+        """)
+        seed(name: "TP1_FIN.COM", body: """
+        $ ! TP1_FIN.COM -- end of TP1: brake and hand back to automatic.
+        $ !                fin du TP1 : freinage et retour a l'automatique.
+        $ VALCP SET RAME 101 /LEVER=-100
+        $ WAIT 00:00:06
+        $ VALCP SET RAME 101 /LEVER=0
+        $ VALCP SET RAME 101 /KG=OFF
+        $ VALCP SET RAME 101 /AUTOMATIC
+        $ WRITE SYS$OUTPUT "Rame 101 back in automatic. / Rame 101 rendue a l'automatique."
+        $ EXIT
+        """)
+        seed(name: "TP2.COM", body: """
+        $ ! TP2.COM -- EB-trip diagnosis down to the board
+        $ !            Diagnostic d'un declenchement FU jusqu'a la carte
+        $ WRITE SYS$OUTPUT "=== TP2: EB TRIP DIAGNOSIS (LRU) ==="
+        $ WRITE SYS$OUTPUT "=== TP2: DIAGNOSTIC D'UN DECLENCHEMENT FU (CARTE) ==="
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "A fault has just been injected on rame 102. Find it, name"
+        $ WRITE SYS$OUTPUT "the suspect board, then restore service."
+        $ WRITE SYS$OUTPUT "Un defaut vient d'etre injecte sur la rame 102. Trouvez-le,"
+        $ WRITE SYS$OUTPUT "nommez la carte suspecte, puis retablissez le service."
+        $ VALCP SET RAME 102 /SIGNAL=ON
+        $ WAIT 00:00:02
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Method / Demarche :"
+        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             which point? / quel point ?"
+        $ WRITE SYS$OUTPUT "  2. VALCP SHOW RAME 102     program + EB cause / cause FU"
+        $ WRITE SYS$OUTPUT "  3. RUN LRU_LOOKUP          suspect board / carte suspecte"
+        $ WRITE SYS$OUTPUT "  4. Restore: clear the fault, release the EB at a stand, ack:"
+        $ WRITE SYS$OUTPUT "     Retablir : levez le defaut, FU relache a l'arret, acquittez :"
+        $ WRITE SYS$OUTPUT "       SET RAME 102 /SIGNAL=OFF"
+        $ WRITE SYS$OUTPUT "       START RAME 102"
+        $ WRITE SYS$OUTPUT "       ACKNOWLEDGE ALARM ALL"
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Self-check: the EB cause reads SF; the lookup names CPFS-A"
+        $ WRITE SYS$OUTPUT "(vehicle) and the WCU AFSC/PP board."
+        $ WRITE SYS$OUTPUT "Auto-verification : la cause FU indique SF ; la recherche"
+        $ WRITE SYS$OUTPUT "nomme CPFS-A (vehicule) et la carte AFSC/PP du WCU."
+        $ EXIT
+        """)
+        seed(name: "TP3.COM", body: """
+        $ ! TP3.COM -- Adhesion and the anti-skid function
+        $ !            Adherence et fonction anti-patinage
+        $ WRITE SYS$OUTPUT "=== TP3: ADHESION AND THE ANTI-SKID FUNCTION ==="
+        $ WRITE SYS$OUTPUT "=== TP3: ADHERENCE ET FONCTION ANTI-PATINAGE ==="
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Rame 103 now runs over a low-adhesion patch under traction."
+        $ WRITE SYS$OUTPUT "La rame 103 franchit desormais une zone glissante en traction."
+        $ VALCP SET RAME 103 /SLIP=ON
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Observe / Observez :"
+        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             PATINAGE raises (advisory)."
+        $ WRITE SYS$OUTPUT "  2. The affected car's effort is cancelled then ramped back:"
+        $ WRITE SYS$OUTPUT "     the anti-skid trips on an 8 km/h motor-speed spread and"
+        $ WRITE SYS$OUTPUT "     cannot act per wheel -- the differential forbids it."
+        $ WRITE SYS$OUTPUT "     L'effort de la voiture touchee est annule puis retabli en"
+        $ WRITE SYS$OUTPUT "     rampe : l'anti-patinage detecte un ecart moteur de 8 km/h"
+        $ WRITE SYS$OUTPUT "     et ne peut agir par roue -- le differentiel l'interdit."
+        $ WRITE SYS$OUTPUT "  3. MONITOR DYNAMICS        speed vs consigne under slip."
+        $ WRITE SYS$OUTPUT "                             vitesse vs consigne en patinage."
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Restore & acknowledge / Retablissez et acquittez :"
+        $ WRITE SYS$OUTPUT "   SET RAME 103 /SLIP=OFF"
+        $ WRITE SYS$OUTPUT "   ACKNOWLEDGE ALARM ALL"
+        $ EXIT
+        """)
     }
 
     private func seed(name: String, body: String) {

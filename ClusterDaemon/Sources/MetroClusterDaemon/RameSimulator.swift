@@ -553,7 +553,7 @@ final class RameSimulator {
         train.position = train.position.truncatingRemainder(dividingBy: Sim.trackLength)
         if train.position < 0 { train.position += Sim.trackLength }
 
-        updateAuxiliaries(&train, demand: demand, dt: dt)
+        updateAuxiliaries(&train, demand: demand, emergency: emergency, dt: dt)
     }
 
     private func tractiveCapability(at v: Double) -> Double {
@@ -666,12 +666,47 @@ final class RameSimulator {
         }
     }
 
-    private func updateAuxiliaries(_ train: inout Train, demand: Double, dt: Double) {
-        let motoring = demand > 500
-        let braking = demand < -500
-        train.tractionCurrent = motoring ? min(1240, 200 + train.speed * 55) : (braking ? 120 : 40)
+    /// Mirror of the app's publishElectrical: back the bench picture
+    /// (ii / il / iex / mhi, thesis notation) out of the force demand.
+    private func updateAuxiliaries(_ train: inout Train, demand: Double,
+                                   emergency: Bool, dt: Double) {
+        let motoring = demand > 500 && !emergency
+        let regenerating = demand < -500 && train.speed > 1.5 && !emergency
+
+        if motoring || regenerating {
+            let omega = max(train.speed, 0.1) / Sim.wheelRadius * Sim.gearRatio
+            let torquePerMotor = (abs(demand) / 2) * Sim.wheelRadius / (2 * Sim.gearRatio)
+            var ratio = Sim.imageSerieFullField
+            var ii = (torquePerMotor / (Sim.motorTorquePerAmp2 * ratio)).squareRoot()
+            if motoring {
+                let loop = 2 * Sim.motorTorquePerAmp2 * ratio * ii * omega
+                    + ii * Sim.armatureResistance
+                if loop > Sim.lineVoltage {
+                    ratio = Sim.imageSerieWeakField
+                    ii = (torquePerMotor / (Sim.motorTorquePerAmp2 * ratio)).squareRoot()
+                }
+            }
+            ii = min(ii, Sim.armatureCurrentMax)
+            let duty = min(1, max(0,
+                (2 * Sim.motorTorquePerAmp2 * ratio * ii * omega + ii * Sim.armatureResistance)
+                    / Sim.lineVoltage))
+            train.armatureCurrent = ii
+            train.excitationCurrent = ratio * ii
+            train.modulationRatio = duty
+            train.lineCurrent = 2 * duty * ii * (motoring ? 1 : -0.85)
+            train.tractionCurrent = max(60, 2 * ii)
+            train.mainVoltage = motoring
+                ? Sim.lineVoltage - abs(train.lineCurrent) * 0.02
+                : min(825, Sim.lineVoltage + abs(train.lineCurrent) * 0.15)
+        } else {
+            train.armatureCurrent = 0
+            train.excitationCurrent = 0
+            train.modulationRatio = 0
+            train.lineCurrent = 0
+            train.tractionCurrent = 40
+            train.mainVoltage = Sim.lineVoltage - 0.8
+        }
         train.tractionTorque = max(-100, min(100, demand / (Sim.tareMass * Sim.maxAcceleration) * 100))
-        train.mainVoltage = 750 - (motoring ? train.tractionCurrent * 0.02 : 0.8)
         train.compressorPressure += (train.isCompressorRunning ? 0.08 : -0.01) * dt * 10
         if train.compressorPressure < 7.4 { train.isCompressorRunning = true }
         if train.compressorPressure > 9.0 { train.isCompressorRunning = false }

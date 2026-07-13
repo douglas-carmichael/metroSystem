@@ -144,6 +144,14 @@ struct Train: Identifiable, Hashable, Codable {
     var cvsOutputVoltage: Double = 112.0       // static converter (CVS) LV output
     var tractionCurrent: Double = 0
     var tractionTorque: Double = 0     // percent, -100..100
+
+    // Traction-chain bench telemetry (VAL backend; zero under the other
+    // backends -- views gate on `speedProgram` as usual). Thesis
+    // notation: ii / il / iex / mhi.
+    var armatureCurrent: Double = 0    // ii, A -- per-car armature loop
+    var lineCurrent: Double = 0        // il, A signed (negative = regen return)
+    var excitationCurrent: Double = 0  // iex, A per motor
+    var modulationRatio: Double = 0    // mhi, 0...1 chopper duty
     var lightingCurrent: Double = 15.0         // ECLAIRAGE circuit draw (A)
     var compressorPressure: Double = 8.5
     var isCompressorRunning: Bool = false
@@ -180,6 +188,7 @@ struct Train: Identifiable, Hashable, Codable {
         case kacopSecondsSinceAck, kacopWarning
         case mainVoltage, batteryVoltage, cvsOutputVoltage
         case tractionCurrent, tractionTorque, lightingCurrent
+        case armatureCurrent, lineCurrent, excitationCurrent, modulationRatio
         case compressorPressure, isCompressorRunning
         case interiorTemperature, targetTemperature, brakeBoxTemperature
         case isLoadSheddingActive, areLightsOn, areVentilated, isHeating
@@ -246,6 +255,10 @@ struct Train: Identifiable, Hashable, Codable {
         tractionCurrent = try c.decodeIfPresent(Double.self, forKey: .tractionCurrent) ?? 0
         tractionTorque = try c.decodeIfPresent(Double.self, forKey: .tractionTorque) ?? 0
         lightingCurrent = try c.decodeIfPresent(Double.self, forKey: .lightingCurrent) ?? 15.0
+        armatureCurrent = try c.decodeIfPresent(Double.self, forKey: .armatureCurrent) ?? 0
+        lineCurrent = try c.decodeIfPresent(Double.self, forKey: .lineCurrent) ?? 0
+        excitationCurrent = try c.decodeIfPresent(Double.self, forKey: .excitationCurrent) ?? 0
+        modulationRatio = try c.decodeIfPresent(Double.self, forKey: .modulationRatio) ?? 0
         compressorPressure = try c.decodeIfPresent(Double.self, forKey: .compressorPressure) ?? 8.5
         isCompressorRunning = try c.decodeIfPresent(Bool.self, forKey: .isCompressorRunning) ?? false
         interiorTemperature = try c.decodeIfPresent(Double.self, forKey: .interiorTemperature) ?? 22.0
