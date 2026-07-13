@@ -15,3 +15,8 @@ DerivedData/
 
 # ClusterDaemon SwiftPM build products
 ClusterDaemon/.build/
+
+# Source documents not cleared for redistribution (kept locally only;
+# see docs/sources/README.md for provenance and how to obtain them)
+docs/sources/These_Verhille.pdf
+docs/sources/SiemensTransportationSystemsInc_03152007.pdf
