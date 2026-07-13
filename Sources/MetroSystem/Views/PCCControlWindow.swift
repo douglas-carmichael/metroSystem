@@ -359,12 +359,16 @@ private struct LineControlPanel: View {
                     Text("\(language.t("line.sp.label")):")
                         .font(RetroTheme.monoSm)
                         .foregroundColor(RetroTheme.amberDim)
+                        .lineLimit(1)
+                        .fixedSize()
                     stationPicker(language.t("line.sp.from"), selection: $spFrom)
                     stationPicker(language.t("line.sp.to"), selection: $spTo)
                     HStack(spacing: 4) {
                         Text("\(language.t("line.sp.interval")):")
                             .font(RetroTheme.monoSm)
                             .foregroundColor(RetroTheme.amberDim)
+                            .lineLimit(1)
+                            .fixedSize()
                         ForEach([30.0, 60.0, 120.0], id: \.self) { value in
                             RetroButton("\(Int(value))s", highlighted: spInterval == value) {
                                 spInterval = value
@@ -402,6 +406,8 @@ private struct LineControlPanel: View {
             Text("\(label):")
                 .font(RetroTheme.monoSm)
                 .foregroundColor(RetroTheme.amberDim)
+                .lineLimit(1)
+                .fixedSize()
             Menu {
                 ForEach(world.stations) { station in
                     Button("\(station.id)  \(station.name)") {
