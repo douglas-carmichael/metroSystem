@@ -2,7 +2,8 @@
 
 The `VAL` backend (the default; `SET BACKEND VAL`) is built on the
 architecture of the real VAL system as documented in three primary
-sources kept in the repo root:
+sources kept in `docs/sources/` (provenance and redistribution notes in
+[docs/sources/README.md](sources/README.md)):
 
 - **`VAL_Assessment.pdf`** — G. Anagnostopoulos, *Interim Assessment of
   the VAL Automated Guideway Transit System*, US DOT/UMTA report

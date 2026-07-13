@@ -74,7 +74,7 @@ Automatique de Trains Inter-Connectés), a model-scale CBTC autopilot.
   AVP/AVO racks, B1/B2/B3 beacon station stops, the image-série
   traction chain, and full console-A22 manual driving (KG, reverser,
   traction/brake lever, KACOP dead-man). Sourced from the UMTA/DOT VAL
-  assessment and the VAL 206 thesis in the repo root; details in
+  assessment and the VAL 206 thesis in `docs/sources/`; details in
   [docs/val-backend.md](docs/val-backend.md).
 - **CBTC_SIM** — the moving-block scan that originally drove the app,
   kept as its own engine: continuous movement authority behind the
