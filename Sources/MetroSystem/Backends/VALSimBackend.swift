@@ -152,10 +152,11 @@ final class VALSimBackend: MetroBackendEngine {
         train.cvsOutputVoltage = train.mainVoltage > 400
             ? 112.0 - (750 - train.mainVoltage) * 0.01
             : max(0, train.cvsOutputVoltage - 40 * dt)
-        // Lighting circuit draw follows the lamps and DELESTAGE BT shedding.
-        train.lightingCurrent = train.areLightsOn
+        // Lighting circuit draw follows the lamps, DELESTAGE BT shedding,
+        // and the KPH headlights.
+        train.lightingCurrent = (train.areLightsOn
             ? (train.isLoadSheddingActive ? 5.0 : 15.0)
-            : 0.0
+            : 0.0) + (train.pupitreKPH ? 2.0 : 0.0)
         // Friction-brake box heats under service/emergency braking, cools
         // otherwise (bounded to a plausible TCMS range).
         let brakeHeat = (braking || train.isEmergencyBrakeApplied) ? 14.0 : -6.0
@@ -220,6 +221,9 @@ final class VALSimBackend: MetroBackendEngine {
                    .advisory, "alarm.msg.enrayage")
             // KACOP vigilance warning (manual driving, dead-man overdue).
             sample(world, source, "VIGILANCE", train.kacopWarning, .minor, "alarm.msg.kacop")
+            // KIBS engaged: a vital loop is inhibited -- standing alarm
+            // for as long as the bypass is in (ISA-18.2: bypasses alarm).
+            sample(world, source, "KIBS", train.pupitreKIBS, .major, "alarm.msg.kibs")
 
             switch train.worstTire {
             case .ok:

@@ -28,6 +28,7 @@ enum Strings {
         "alarm.msg.signalfault", "alarm.msg.patinage", "alarm.msg.enrayage",
         "alarm.msg.tirelow", "alarm.msg.tirepuncture", "alarm.msg.tireburst",
         "alarm.msg.paxfull", "alarm.msg.doorheld", "alarm.msg.kacop",
+        "alarm.msg.kibs",
         "alarm.msg.controller", "alarm.msg.power", "alarm.msg.track",
         "alarm.msg.platform", "alarm.msg.display", "alarm.msg.switch",
         "alarm.msg.hwlink",
@@ -54,6 +55,7 @@ enum Strings {
         add("detail.gauge.speed",   "SPEED",                               "VITESSE")
         add("detail.gauge.consigne","SP",                                  "CONS")
         add("detail.gauge.ma",      "MOVEMENT AUTHORITY",                  "AUTORISATION MVT")
+        add("detail.gauge.stoppoint","STOPPING POINT",                     "POINT D'ARRÊT")
         add("detail.gauge.pax",     "PASSENGER LOAD",                      "CHARGE VOYAGEURS")
         add("detail.gauge.traction","TRACTION CURRENT",                    "COURANT TRACTION")
         add("detail.sec.asserv",    "SPEED REGULATION",                    "ASSERVISSEMENT")
@@ -61,6 +63,7 @@ enum Strings {
         add("detail.asserv.error",  "SPEED ERROR",                        "ERREUR VIT.")
         add("detail.asserv.accel",  "ACCELERATION",                       "ACCÉLÉRATION")
         add("detail.asserv.dist",   "DISTANCE TO MA",                     "DIST. CIBLE AM")
+        add("detail.asserv.diststop","DIST. TO STOP POINT",               "DIST. POINT D'ARRÊT")
         add("detail.asserv.target", "LINE SPEED",                         "VITESSE LIGNE")
         add("detail.sec.traction",  "TRACTION / BRAKING",                 "TRACTION / FREINAGE")
         add("detail.traction.current","CURRENT",                          "COURANT")
@@ -330,6 +333,8 @@ enum Strings {
                                     "Portes maintenues ouvertes au-delà du stationnement")
         add("alarm.msg.kacop",      "KACOP vigilance overdue -- acknowledge or the EB trips",
                                     "Vigilance KACOP dépassée -- acquitter sinon FU")
+        add("alarm.msg.kibs",       "KIBS engaged: door safety loop inhibited (recovery move)",
+                                    "KIBS enclenché : boucle de sécurité portes inhibée (secours)")
         add("alarm.msg.controller", "PCC controller watchdog fault -- all trains held",
                                     "Défaut chien de garde PCC -- toutes rames retenues")
         add("alarm.msg.hwlink",     "Model-track hardware link down while output armed",
@@ -376,6 +381,9 @@ enum Strings {
         // VAL fixed-block telemetry labels (values are firmware mnemonics).
         add("train.program",        "PROG",                                "PROG")
         add("train.ebcause",        "EB CAUSE",                            "CAUSE FU")
+        // Fixed-block VAL has no radioed movement authority: the figure
+        // is the distance to the encoded program's stopping point.
+        add("train.stoppoint",      "STOP PT",                             "PT ARRÊT")
 
         // Console A22 -- pupitre de conduite manuelle. KG / KACOP / AV /
         // 0 / AR are real cab markings, language-neutral by convention.
@@ -391,6 +399,8 @@ enum Strings {
         add("pupitre.traction.inhibited","Traction inhibited (KG / reverser / doors / EB)",
                                     "Traction inhibée (KG / inverseur / portes / FU)")
         add("pupitre.covered",      "Cab cover locked -- automatic driving","Capot verrouillé -- pilotage automatique")
+        add("pupitre.kibs.engaged", "KIBS ENGAGED -- door loop inhibited, creep limit 3 m/s",
+                                    "KIBS ENCLENCHÉ -- boucle portes inhibée, limite 3 m/s")
         add("detail.sec.pupitre",   "MANUAL DRIVING -- CONSOLE A22",       "CONDUITE MANUELLE -- PUPITRE A22")
         add("detail.sec.bench",     "TRACTION BENCH -- CHOPPER QUANTITIES","BANC TRACTION -- GRANDEURS HACHEUR")
         add("detail.atp.program",   "Speed program",                       "Programme de vitesse")
@@ -470,7 +480,10 @@ enum Strings {
         add("dynamics.col.vel",     "SPEED",                               "VITESSE")
         add("dynamics.col.consigne","SETPOINT",                            "CONSIGNE")
         add("dynamics.col.acc",     "ACCEL",                               "ACCÉL")
-        add("dynamics.col.ma",      "MA",                                  "AM")
+        // Neutral across backends: under CBTC the figure is the movement
+        // authority; under fixed-block VAL it is the distance to the
+        // program's stopping point. One column serves both.
+        add("dynamics.col.ma",      "LIMIT",                               "LIMITE")
         add("dynamics.col.state",   "STATE",                               "ÉTAT")
         add("dynamics.state.accel", "ACCEL",                               "ACCÉL")
         add("dynamics.state.cruise","CRUISE",                              "PALIER")
@@ -486,6 +499,9 @@ enum Strings {
         add("dynamics.state.perturbed","PERT",                             "PERT")
         add("dynamics.trace.title", "SPEED TRACE",                         "TRACÉ DE VITESSE")
         add("dynamics.trace.axis",  "60 s window · line speed dashed",     "fenêtre 60 s · vitesse ligne en tirets")
+        add("dynamics.current.title","LINE CURRENT TRACE (IL)",            "TRACÉ COURANT DE LIGNE (IL)")
+        add("dynamics.current.axis","±1300 A · zero centred · below = regeneration",
+                                    "±1300 A · zéro centré · en dessous = récupération")
         add("dynamics.trace.empty", "(collecting samples...)",             "(acquisition en cours...)")
         add("dynamics.profile.fmt", "LIMITS  V %.1f m/s · accel %.2f m/s² · service brake %.2f m/s² · EB %.2f m/s²",
                                     "LIMITES  V %.1f m/s · accél %.2f m/s² · frein de service %.2f m/s² · FU %.2f m/s²")
@@ -768,6 +784,7 @@ enum Strings {
         add("valcp.rame.speed",     "  Speed:           ",                 "  Vitesse :         ")
         add("valcp.rame.consigne",  "setpoint",                            "consigne")
         add("valcp.rame.ma",        "  Movement auth.:  ",                 "  Autor. mouvement: ")
+        add("valcp.rame.stoppoint", "  Stopping point:  ",                 "  Point d'arrêt :   ")
         add("valcp.rame.direction", "  Direction:       ",                 "  Sens :            ")
         add("valcp.rame.status",    "  Status:          ",                 "  État :            ")
         add("valcp.rame.mode",      "  Mode:            ",                 "  Mode :            ")
@@ -916,6 +933,10 @@ enum Strings {
                                     "%%SET-S-PUPITRE, manipulateur rame %@ %+.0f %%\n")
         add("valcp.rame.kacop.ack", "%%SET-S-KACOP, vigilance acknowledged on train %@\n",
                                     "%%SET-S-KACOP, vigilance acquittée sur la rame %@\n")
+        add("valcp.rame.kibs",      "%%SET-S-PUPITRE, train %@ KIBS %@ (safety-loop inhibition)\n",
+                                    "%%SET-S-PUPITRE, KIBS rame %@ %@ (inhibition boucle de sécurité)\n")
+        add("valcp.rame.kph",       "%%SET-S-PUPITRE, train %@ headlights %@\n",
+                                    "%%SET-S-PUPITRE, phares rame %@ %@\n")
         // VALCP SHOW RAME rows (VAL fixed-block telemetry).
         add("valcp.rame.program",   "  Speed program:  ",                  "  Programme :     ")
         add("valcp.rame.ebcause",   "EB cause:",                           "cause FU :")

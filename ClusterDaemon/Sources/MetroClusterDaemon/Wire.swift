@@ -45,6 +45,8 @@ enum TrainCommandKind: String, Codable {
     case pupitreKG
     case pupitreReverser
     case pupitreLever
+    case pupitreKIBS
+    case pupitreKPH
     case kacopAck
 }
 

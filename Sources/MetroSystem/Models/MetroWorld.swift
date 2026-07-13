@@ -252,6 +252,8 @@ final class MetroWorld: ObservableObject {
                 t.mode = .auto
                 t.manualSpeedRequest = 0
                 t.pupitreLever = 0
+                // A safety bypass must not persist into automatic driving.
+                t.pupitreKIBS = false
             case .modeManual:
                 t.mode = .manual
                 t.manualSpeedRequest = 0
@@ -274,6 +276,11 @@ final class MetroWorld: ObservableObject {
             case .pupitreLever:
                 guard t.mode == .manual else { return }
                 t.pupitreLever = max(-1, min(1, value ?? 0))
+            case .pupitreKIBS:
+                guard t.mode == .manual else { return }
+                t.pupitreKIBS = (value ?? 0) > 0.5
+            case .pupitreKPH:
+                t.pupitreKPH = (value ?? 0) > 0.5
             case .kacopAck:
                 t.kacopSecondsSinceAck = 0
                 t.kacopWarning = false

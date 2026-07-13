@@ -722,7 +722,12 @@ private struct TrainPanel: View {
                     StatusLine(label: language.t("train.speed"),
                                value: String(format: "%5.1f m/s", train.speed),
                                valueColor: speedColor)
-                    StatusLine(label: language.t("train.ma"),
+                    // CBTC vocabulary vs 1983 VAL: a moving-block rame
+                    // reports its movement authority; a fixed-block rame
+                    // reports the distance to the encoded program's
+                    // stopping point (point d'arrêt).
+                    StatusLine(label: language.t(train.speedProgram.isEmpty
+                                                 ? "train.ma" : "train.stoppoint"),
                                value: String(format: "%5.0f m", train.distanceToMA),
                                valueColor: train.distanceToMA < Sim.safetyMargin ? .red : RetroTheme.green)
                     StatusLine(label: language.t("train.doors"),
@@ -965,6 +970,12 @@ private struct PupitreControls: View {
                 }
                 RetroButton(kacopLabel, highlighted: train.kacopWarning) {
                     _ = network.control(train, .kacopAck)
+                }
+                RetroButton("KIBS", highlighted: train.pupitreKIBS) {
+                    _ = network.control(train, .pupitreKIBS, value: train.pupitreKIBS ? 0 : 1)
+                }
+                RetroButton("KPH", highlighted: train.pupitreKPH) {
+                    _ = network.control(train, .pupitreKPH, value: train.pupitreKPH ? 0 : 1)
                 }
                 if train.kacopWarning {
                     Text(language.t("pupitre.kacop.warning"))

@@ -187,6 +187,8 @@ struct Train: Identifiable, Codable {
     var pupitreKG: Bool = false
     var pupitreReverser: Int = 0
     var pupitreLever: Double = 0
+    var pupitreKIBS: Bool = false
+    var pupitreKPH: Bool = false
     var kacopSecondsSinceAck: Double = 0
     var kacopWarning: Bool = false
 
@@ -230,6 +232,7 @@ struct Train: Identifiable, Codable {
         case consigneVitesse, speedError, distanceToMA, tires
         case speedProgram, ebCause
         case pupitreKG, pupitreReverser, pupitreLever
+        case pupitreKIBS, pupitreKPH
         case kacopSecondsSinceAck, kacopWarning
         case mainVoltage, batteryVoltage, tractionCurrent, tractionTorque
         case compressorPressure, isCompressorRunning, interiorTemperature
@@ -286,6 +289,8 @@ struct Train: Identifiable, Codable {
         pupitreKG = try c.decodeIfPresent(Bool.self, forKey: .pupitreKG) ?? false
         pupitreReverser = try c.decodeIfPresent(Int.self, forKey: .pupitreReverser) ?? 0
         pupitreLever = try c.decodeIfPresent(Double.self, forKey: .pupitreLever) ?? 0
+        pupitreKIBS = try c.decodeIfPresent(Bool.self, forKey: .pupitreKIBS) ?? false
+        pupitreKPH = try c.decodeIfPresent(Bool.self, forKey: .pupitreKPH) ?? false
         kacopSecondsSinceAck = try c.decodeIfPresent(Double.self, forKey: .kacopSecondsSinceAck) ?? 0
         kacopWarning = try c.decodeIfPresent(Bool.self, forKey: .kacopWarning) ?? false
         tires = try c.decodeIfPresent([Tire].self, forKey: .tires)

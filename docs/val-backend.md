@@ -111,10 +111,13 @@ unchanged as the **`CBTC_SIM`** backend (`Backends/CBTCSimBackend.swift`)
 5. **Console A22** (`VALOnboard.manualDrive`) — manual mode, semantics
    per the VALPupitreSim project:
    - **KG** master power; **reverser** AV/0/AR (sense changes at a stand
-     only); **T/F lever** −1…+1 (full service brake … full traction).
-   - Traction inhibited by KG off, reverser neutral, doors open, FU
-     latched, or the **CML ceiling** (the `/SPEED` setpoint, default
-     20 m/s); **service braking is always available**.
+     only); **T/F lever** −1…+1 (full service brake … full traction);
+     **KIBS** safety-loop inhibition (door traction interlock bypassed
+     for recovery moves — clamped to a 3 m/s creep, standing KIBS alarm
+     while engaged, cleared on return to automatic); **KPH** headlights.
+   - Traction inhibited by KG off, reverser neutral, doors open (unless
+     KIBS), FU latched, or the **CML ceiling** (the `/SPEED` setpoint,
+     default 20 m/s); **service braking is always available**.
    - **KACOP** dead-man: rising-edge acknowledgment, 14 s warning
      (SCADA point VIGILANCE + pupitre voyant), 20 s auto-FU. Bypassed
      entirely in automatic — the point of a driverless metro.
@@ -137,6 +140,17 @@ unchanged as the **`CBTC_SIM`** backend (`Backends/CBTCSimBackend.swift`)
    faults shrink grip and add drag as before. Davis resistance
    `Fr = A + B·v + C·v²` and the passenger-dependent mass (31 t tare +
    70 kg/pax) close the longitudinal dynamics.
+
+## Terminology note: no "movement authority" in 1983
+
+"Movement authority" is moving-block CBTC vocabulary (IEEE 1474 /
+ETCS); VAL has no radioed authority — its enforced limit is the
+**stopping point of the encoded program** (point d'arrêt: the PP stop
+point, the platform marker, or the free-run horizon). The wire field
+keeps the neutral name `movementAuthority`, but every operator surface
+labels the figure by backend: *movement authority* for CBTC/PRATIC
+rames, *stopping point / point d'arrêt* for VAL rames (shared column
+headers use the neutral LIMIT/LIMITE).
 
 ## What the surfaces show
 

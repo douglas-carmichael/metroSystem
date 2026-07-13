@@ -115,7 +115,9 @@ extension DCLEngine {
         s += String(format: "%@%8.1f m   (%@)\n", tr("valcp.rame.position"), t.position, cantonName)
         s += String(format: "%@%6.2f m/s  (%@ %5.2f m/s)\n", tr("valcp.rame.speed"), t.speed,
                     tr("valcp.rame.consigne"), t.consigneVitesse)
-        s += String(format: "%@%8.1f m\n", tr("valcp.rame.ma"), t.distanceToMA)
+        s += String(format: "%@%8.1f m\n",
+                    tr(t.speedProgram.isEmpty ? "valcp.rame.ma" : "valcp.rame.stoppoint"),
+                    t.distanceToMA)
         s += tr("valcp.rame.direction") + tr(dirKey) + "\n"
         s += tr("valcp.rame.status")    + tr(statusKey) + "\n"
         s += tr("valcp.rame.mode")      + tr(modeKey) + "\n"

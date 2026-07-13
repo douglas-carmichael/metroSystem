@@ -190,6 +190,8 @@ extension DCLEngine {
     ///                  /REVERSER=AV|0|AR     (FR: /INVERSEUR)
     ///                  /LEVER=<-100..100>    (FR: /MANIPULATEUR, percent)
     ///                  /KACOP                (dead-man acknowledgment)
+    ///                  /KIBS=ON|OFF          (safety-loop inhibition, creep-limited)
+    ///                  /KPH=ON|OFF           (headlights)
     ///                  /PORTES=ON|OFF        (door fault; /DOOR synonym)
     ///                  /TRACTION=ON|OFF      (engine fault; /ENGINE synonym)
     ///                  /FREIN=ON|OFF         (brake fault; /BRAKE synonym)
@@ -293,6 +295,21 @@ extension DCLEngine {
         if cmd.hasQualifier("KACOP", min: 5) {
             return routed(.kacopAck, localText:
                 String(format: tr("valcp.rame.kacop.ack"), dLabel))
+        }
+        if let kibs = cmd.qualifierValue("KIBS", min: 4) {
+            let on = kibs.uppercased() == "ON"
+            guard train.mode == .manual else {
+                return String(format: tr("valcp.rame.pupitre.notmanual"), dLabel)
+            }
+            return routed(.pupitreKIBS, value: on ? 1 : 0, localText:
+                String(format: tr("valcp.rame.kibs"), dLabel,
+                       on ? tr("valcp.rame.pupitre.on") : tr("valcp.rame.pupitre.off")))
+        }
+        if let kph = cmd.qualifierValue("KPH", min: 3) {
+            let on = kph.uppercased() == "ON"
+            return routed(.pupitreKPH, value: on ? 1 : 0, localText:
+                String(format: tr("valcp.rame.kph"), dLabel,
+                       on ? tr("valcp.rame.pupitre.on") : tr("valcp.rame.pupitre.off")))
         }
         // Latched fault points and tires model the owning node's physical
         // rolling stock -- owner-only by design (no wire command exists).

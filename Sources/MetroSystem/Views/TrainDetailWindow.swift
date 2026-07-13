@@ -149,7 +149,8 @@ private struct GaugeCluster: View {
             VStack(spacing: 14) {
                 BarMeter(value: train.distanceToMA,
                          maxValue: Sim.trackLength / 2,
-                         caption: language.t("detail.gauge.ma"),
+                         caption: language.t(train.speedProgram.isEmpty
+                                             ? "detail.gauge.ma" : "detail.gauge.stoppoint"),
                          readout: String(format: "%.0f m", train.distanceToMA),
                          warn: train.distanceToMA < Sim.safetyMargin,
                          color: RetroTheme.cyan)
@@ -419,7 +420,8 @@ private struct AsservissementSection: View {
                          value: String(format: "%+.2f", train.speedError))
                 ValueRow(label: language.t("detail.asserv.accel"),
                          value: String(format: "%+.2f m/s²", train.acceleration))
-                ValueRow(label: language.t("detail.asserv.dist"),
+                ValueRow(label: language.t(train.speedProgram.isEmpty
+                                           ? "detail.asserv.dist" : "detail.asserv.diststop"),
                          value: String(format: "%.1f m", train.distanceToMA),
                          color: train.distanceToMA < Sim.safetyMargin ? .red : RetroTheme.amberBright)
                 ValueRow(label: language.t("detail.asserv.target"),
@@ -614,6 +616,22 @@ private struct PupitreSection: View {
                             _ = network.control(train, .pupitreReverser, value: Double(value))
                         }
                     }
+                    // KIBS: the safety-loop inhibition for recovery moves
+                    // (door interlock bypassed, creep-limited, alarmed).
+                    // KPH: headlights.
+                    RetroButton("KIBS", enabled: driving, highlighted: train.pupitreKIBS) {
+                        _ = network.control(train, .pupitreKIBS, value: train.pupitreKIBS ? 0 : 1)
+                    }
+                    RetroButton("KPH", enabled: network.canControl(train),
+                                highlighted: train.pupitreKPH) {
+                        _ = network.control(train, .pupitreKPH, value: train.pupitreKPH ? 0 : 1)
+                    }
+                }
+                if train.pupitreKIBS {
+                    Text(language.t("pupitre.kibs.engaged"))
+                        .font(RetroTheme.monoSm)
+                        .foregroundColor(.red)
+                        .retroGlow()
                 }
                 // Manipulateur traction/freinage: chips over the throw.
                 VStack(alignment: .leading, spacing: 4) {

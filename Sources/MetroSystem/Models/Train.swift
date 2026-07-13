@@ -117,6 +117,12 @@ struct Train: Identifiable, Hashable, Codable {
     var pupitreKG: Bool = false        // coupure générale (master power)
     var pupitreReverser: Int = 0       // +1 AV / 0 neutral / -1 AR
     var pupitreLever: Double = 0       // +1 traction ... -1 service brake
+    /// KIBS (inhibition boucle de sécurité): bypasses the door traction
+    /// interlock for recovery moves, creep-limited and alarmed while
+    /// engaged. Manual mode only; cleared on return to automatic.
+    var pupitreKIBS: Bool = false
+    /// KPH (phares): headlights. Cosmetic load on the lighting circuit.
+    var pupitreKPH: Bool = false
     var kacopSecondsSinceAck: Double = 0
     var kacopWarning: Bool = false
 
@@ -185,6 +191,7 @@ struct Train: Identifiable, Hashable, Codable {
         case consigneVitesse, speedError, distanceToMA, tires
         case speedProgram, ebCause
         case pupitreKG, pupitreReverser, pupitreLever
+        case pupitreKIBS, pupitreKPH
         case kacopSecondsSinceAck, kacopWarning
         case mainVoltage, batteryVoltage, cvsOutputVoltage
         case tractionCurrent, tractionTorque, lightingCurrent
@@ -245,6 +252,8 @@ struct Train: Identifiable, Hashable, Codable {
         pupitreKG = try c.decodeIfPresent(Bool.self, forKey: .pupitreKG) ?? false
         pupitreReverser = try c.decodeIfPresent(Int.self, forKey: .pupitreReverser) ?? 0
         pupitreLever = try c.decodeIfPresent(Double.self, forKey: .pupitreLever) ?? 0
+        pupitreKIBS = try c.decodeIfPresent(Bool.self, forKey: .pupitreKIBS) ?? false
+        pupitreKPH = try c.decodeIfPresent(Bool.self, forKey: .pupitreKPH) ?? false
         kacopSecondsSinceAck = try c.decodeIfPresent(Double.self, forKey: .kacopSecondsSinceAck) ?? 0
         kacopWarning = try c.decodeIfPresent(Bool.self, forKey: .kacopWarning) ?? false
         tires = try c.decodeIfPresent([Tire].self, forKey: .tires)

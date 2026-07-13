@@ -14,6 +14,10 @@ struct DynamicsMonitorWindow: View {
     @State private var lastSample: Date = Date()
     @State private var lastUpdate: Date = Date()
     @State private var velocityHistory: [UUID: [Double]] = [:]
+    @State private var currentHistory: [UUID: [Double]] = [:]
+    /// Any visible rame driven by the VAL backend (bench telemetry
+    /// present) -- gates the line-current scope pane.
+    @State private var hasBench: Bool = false
 
     // Per-rame checklist: we track the rames the user has explicitly
     // HIDDEN rather than shown, so a newly added rame appears by default
@@ -82,6 +86,10 @@ struct DynamicsMonitorWindow: View {
                 }
                 Spacer().frame(height: 8)
                 velocityTrace
+                if hasBench {
+                    Spacer().frame(height: 8)
+                    currentTrace
+                }
                 Spacer().frame(height: 8)
                 profileFooter
                 statusBar
@@ -153,9 +161,18 @@ struct DynamicsMonitorWindow: View {
                 buf.removeFirst(buf.count - Self.traceCapacity)
             }
             velocityHistory[train.id] = buf
+
+            var amps = currentHistory[train.id, default: []]
+            amps.append(train.lineCurrent)
+            if amps.count > Self.traceCapacity {
+                amps.removeFirst(amps.count - Self.traceCapacity)
+            }
+            currentHistory[train.id] = amps
         }
         let currentIds = Set(trains.map(\.id))
         velocityHistory = velocityHistory.filter { currentIds.contains($0.key) }
+        currentHistory = currentHistory.filter { currentIds.contains($0.key) }
+        hasBench = trains.contains { !$0.speedProgram.isEmpty }
     }
 
     // MARK: - Subviews
@@ -287,6 +304,64 @@ struct DynamicsMonitorWindow: View {
                     .font(Self.smallFont)
                     .foregroundColor(RetroTheme.greenDim)
             }
+        }
+    }
+
+    /// Line-current scope (VAL backend): IL per rame on a zero-centred
+    /// axis, so a launch draws the chopper ramp and every regeneration
+    /// dips below the line. Same palette/legend as the speed trace.
+    private var currentTrace: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 14) {
+                Text(language.t("dynamics.current.title"))
+                    .font(Self.smallFont)
+                    .foregroundColor(RetroTheme.amberDim)
+                Spacer()
+                Text(language.t("dynamics.current.axis"))
+                    .font(Self.smallFont)
+                    .foregroundColor(RetroTheme.amberDim)
+            }
+            Canvas { context, size in
+                drawCurrentTrace(context: context, size: size)
+            }
+            .frame(height: 100)
+            .background(RetroTheme.bg)
+            .overlay(
+                Rectangle()
+                    .stroke(RetroTheme.amberDim, lineWidth: 1)
+            )
+        }
+    }
+
+    private func drawCurrentTrace(context: GraphicsContext, size: CGSize) {
+        let maxAmps = 2 * Sim.armatureCurrentMax * 1.05
+        let midY = size.height / 2
+        let yScale = midY / CGFloat(maxAmps)
+
+        var zero = Path()
+        zero.move(to: CGPoint(x: 0, y: midY))
+        zero.addLine(to: CGPoint(x: size.width, y: midY))
+        context.stroke(zero, with: .color(RetroTheme.amberDim), lineWidth: 0.5)
+
+        let totalSlots = max(1, Self.traceCapacity - 1)
+        let xStep = size.width / CGFloat(totalSlots)
+
+        for (idx, row) in rows.enumerated() {
+            guard let history = currentHistory[row.id], history.count > 1 else { continue }
+            let startSlot = Self.traceCapacity - history.count
+            var path = Path()
+            for (i, amps) in history.enumerated() {
+                let x = CGFloat(startSlot + i) * xStep
+                let y = midY - CGFloat(amps) * yScale
+                if i == 0 {
+                    path.move(to: CGPoint(x: x, y: y))
+                } else {
+                    path.addLine(to: CGPoint(x: x, y: y))
+                }
+            }
+            context.stroke(path,
+                           with: .color(traceColor(for: idx)),
+                           lineWidth: 1.2)
         }
     }
 

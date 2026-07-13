@@ -130,8 +130,11 @@ final class VALOnboard {
             conditionCause = .brakeFault
         } else if controllerAlarm {
             conditionCause = .controllerAlarm
-        } else if train.doorsOpen && train.speed > 0.5 {
-            conditionCause = .doorUnlocked              // train line broken while moving
+        } else if train.doorsOpen && train.speed > 0.5
+                    && !(train.mode == .manual && train.pupitreKIBS) {
+            // Train line broken while moving. KIBS inhibits this loop for
+            // recovery moves (creep-limited and alarmed while engaged).
+            conditionCause = .doorUnlocked
         }
 
         if conditionCause != .none {
@@ -393,13 +396,15 @@ final class VALOnboard {
 
         // CML ceiling: the limited-manual-driving governor. An explicit
         // /SPEED setpoint lowers it; otherwise the mode maximum applies.
-        let ceiling = train.manualSpeedRequest > 0.05
+        // An engaged KIBS clamps everything to the recovery creep.
+        var ceiling = train.manualSpeedRequest > 0.05
             ? min(train.manualSpeedRequest, Sim.manualSpeedMax)
             : Sim.manualSpeedMax
+        if train.pupitreKIBS { ceiling = min(ceiling, Sim.kibsRecoveryCeiling) }
 
         let tractionInhibited = !train.pupitreKG
             || train.pupitreReverser == 0
-            || train.doorsOpen
+            || (train.doorsOpen && !train.pupitreKIBS)
             || train.isEngineFault
             || train.speed >= ceiling
 

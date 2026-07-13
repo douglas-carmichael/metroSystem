@@ -87,6 +87,9 @@ enum Sim {
     // Pupitre de conduite manuelle (console A22) -- KACOP vigilance.
     static let kacopWarningDelay: Double = 14.0  // s without acknowledgment -> warning
     static let kacopTripDelay: Double = 20.0     // s -> automatic FU
+    /// Creep ceiling enforced while KIBS (safety-loop inhibition) is
+    /// engaged for a recovery move.
+    static let kibsRecoveryCeiling: Double = 3.0 // m/s
 
     // Station / passenger model.
     static let stationApproachWindow: Double = 150.0   // m lookahead for a stop point

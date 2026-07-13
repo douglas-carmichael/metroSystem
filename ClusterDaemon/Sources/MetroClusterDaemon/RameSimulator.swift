@@ -131,6 +131,7 @@ final class RameSimulator {
             trains[index].mode = .auto
             trains[index].manualSpeedRequest = 0
             trains[index].pupitreLever = 0
+            trains[index].pupitreKIBS = false
         case .modeManual:
             trains[index].mode = .manual
             trains[index].manualSpeedRequest = 0
@@ -151,6 +152,11 @@ final class RameSimulator {
         case .pupitreLever:
             guard trains[index].mode == .manual else { return }
             trains[index].pupitreLever = max(-1, min(1, cmd.value ?? 0))
+        case .pupitreKIBS:
+            guard trains[index].mode == .manual else { return }
+            trains[index].pupitreKIBS = (cmd.value ?? 0) > 0.5
+        case .pupitreKPH:
+            trains[index].pupitreKPH = (cmd.value ?? 0) > 0.5
         case .kacopAck:
             trains[index].kacopSecondsSinceAck = 0
             trains[index].kacopWarning = false
@@ -309,11 +315,13 @@ final class RameSimulator {
                     state.consigneAccel = 0
                 }
             }
-            let ceiling = train.manualSpeedRequest > 0.05
+            var ceiling = train.manualSpeedRequest > 0.05
                 ? min(train.manualSpeedRequest, Sim.manualSpeedMax)
                 : Sim.manualSpeedMax
+            if train.pupitreKIBS { ceiling = min(ceiling, 3.0) }
             let inhibited = !train.pupitreKG || train.pupitreReverser == 0
-                || train.doorsOpen || train.isEngineFault || train.speed >= ceiling
+                || (train.doorsOpen && !train.pupitreKIBS)
+                || train.isEngineFault || train.speed >= ceiling
             let lever = max(-1.0, min(1.0, train.pupitreLever))
             desired = lever > 0
                 ? (inhibited ? 0 : lever * Sim.maxAcceleration)
@@ -371,7 +379,8 @@ final class RameSimulator {
         if train.isSignalFault { cause = .sfLoss }
         else if train.isDoorFault { cause = .doorFault }
         else if train.isBrakeFault { cause = .brakeFault }
-        else if train.doorsOpen && train.speed > 0.5 { cause = .doorUnlocked }
+        else if train.doorsOpen && train.speed > 0.5
+                    && !(train.mode == .manual && train.pupitreKIBS) { cause = .doorUnlocked }
         if cause != .none {
             train.isEmergencyBrakeApplied = true
             train.ebCause = cause.rawValue

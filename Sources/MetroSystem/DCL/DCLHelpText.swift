@@ -648,6 +648,10 @@ extension HelpLibrary {
                          /REVERSER=AV|0|AR (/INVERSEUR)
                          /LEVER=-100..100  (/MANIPULATEUR, percent)
                          /KACOP
+                         /KIBS=ON|OFF   (safety-loop inhibition: door
+                                         interlock bypassed for recovery
+                                         moves, 3 m/s creep, alarmed)
+                         /KPH=ON|OFF    (headlights)
                          /PORTES=ON|OFF   (/DOOR)
                          /TRACTION=ON|OFF (/ENGINE)
                          /FREIN=ON|OFF    (/BRAKE)

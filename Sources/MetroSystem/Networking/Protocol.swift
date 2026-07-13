@@ -39,6 +39,8 @@ enum TrainCommandKind: String, Codable {
     case pupitreKG        // master power (value: 1 = on, 0 = off)
     case pupitreReverser  // value: +1 AV, 0 neutral, -1 AR
     case pupitreLever     // value: -1 (full brake) ... +1 (full traction)
+    case pupitreKIBS      // safety-loop inhibition (value: 1 = on, 0 = off)
+    case pupitreKPH       // headlights (value: 1 = on, 0 = off)
     case kacopAck         // dead-man acknowledgment (momentary press)
 }
 

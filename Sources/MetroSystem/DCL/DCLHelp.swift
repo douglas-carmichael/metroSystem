@@ -314,6 +314,15 @@ extension DCLEngine {
         var passed = 0
         var lines: [String] = []
         lines.append("\nSELFTEST -- driving every documented verb (LOGOUT/EXIT/CLEAR excluded)\n")
+
+        // The SET RAME / SET LINE verbs mutate real state (only a few
+        // verbs honour dryRun) -- snapshot what the harness touches and
+        // restore it afterwards so a SELFTEST leaves no injected residue
+        // (a latched brake fault, a cycled tire, the line switched on).
+        let touchedRame = world?.findTrain(label: "101")
+        let lineWasRunning = world?.isRunning ?? false
+        let lineWasEmergency = world?.isEmergencyStopped ?? false
+
         dryRun = true
         defer { dryRun = false }
         for v in verbs {
@@ -332,6 +341,36 @@ extension DCLEngine {
             let label = v.padding(toLength: 38, withPad: " ", startingAt: 0)
             lines.append(String(format: "  %@  %@  (%d chars)", label, status.padding(toLength: 14, withPad: " ", startingAt: 0), chars))
         }
+
+        // Restore the injected state (fault flags, tires, driving mode,
+        // pupitre) and the line switches to their pre-test values.
+        if let world, let before = touchedRame {
+            world.mutate(before.id) { t in
+                t.isDoorFault = before.isDoorFault
+                t.isEngineFault = before.isEngineFault
+                t.isBrakeFault = before.isBrakeFault
+                t.isSignalFault = before.isSignalFault
+                t.isPatinage = before.isPatinage
+                t.isEnrayage = before.isEnrayage
+                t.isEmergencyBrakeApplied = before.isEmergencyBrakeApplied
+                t.ebCause = before.ebCause
+                t.tires = before.tires
+                t.mode = before.mode
+                t.manualSpeedRequest = before.manualSpeedRequest
+                t.pupitreKG = before.pupitreKG
+                t.pupitreReverser = before.pupitreReverser
+                t.pupitreLever = before.pupitreLever
+            }
+            if world.isRunning != lineWasRunning {
+                lineWasRunning ? world.startService() : world.stopService()
+            }
+            if world.isEmergencyStopped != lineWasEmergency {
+                world.emergencyStopAll(lineWasEmergency)
+            }
+            lines.append("")
+            lines.append("  Injected test state restored (rame 101, line switches).")
+        }
+
         lines.append("")
         lines.append("  \(passed)/\(verbs.count) verbs returned cleanly.")
         lines.append("")

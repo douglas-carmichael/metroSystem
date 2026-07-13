@@ -558,12 +558,14 @@ extension DCLEngine {
     /// state for every rame on the line. Position is in metres along the
     /// loop, speed in m/s (with the commanded consigne beside it),
     /// acceleration in m/s² derived from the speed delta against the
-    /// previous frame, MA is the remaining movement authority, and the
-    /// state column tells you which regime the speed controller is in.
+    /// previous frame, LIMIT is the distance to the enforced stop limit
+    /// (the movement authority under a moving-block backend, the encoded
+    /// program's stopping point under fixed-block VAL), and the state
+    /// column tells you which regime the speed controller is in.
     func monitorDynamics() -> String {
         let now = Date()
         var s = mheader("TRAIN DYNAMICS (LPD)")
-        s += "  Train   Position     Speed / Setpoint     Accel        MA      State\n"
+        s += "  Train   Position     Speed / Setpoint     Accel      Limit     State\n"
         s += "  -----   --------     ----------------     ------    -------   -----\n"
 
         let trains = world?.sortedTrains ?? []
