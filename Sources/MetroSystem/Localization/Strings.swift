@@ -326,7 +326,7 @@ enum Strings {
                                     "Charge voyageurs à 80 % de la capacité ou plus")
         add("alarm.msg.doorheld",   "Doors held open beyond dwell",
                                     "Portes maintenues ouvertes au-delà du stationnement")
-        add("alarm.msg.kacop",      "KACOP vigilance overdue -- acknowledge or the FU trips",
+        add("alarm.msg.kacop",      "KACOP vigilance overdue -- acknowledge or the EB trips",
                                     "Vigilance KACOP dépassée -- acquitter sinon FU")
         add("alarm.msg.controller", "PCC controller watchdog fault -- all trains held",
                                     "Défaut chien de garde PCC -- toutes rames retenues")
@@ -373,21 +373,30 @@ enum Strings {
         add("train.faults",         "FAULTS",                              "DÉFAUTS")
         // VAL fixed-block telemetry labels (values are firmware mnemonics).
         add("train.program",        "PROG",                                "PROG")
-        add("train.ebcause",        "FU CAUSE",                            "CAUSE FU")
+        add("train.ebcause",        "EB CAUSE",                            "CAUSE FU")
 
         // Console A22 -- pupitre de conduite manuelle. KG / KACOP / AV /
         // 0 / AR are real cab markings, language-neutral by convention.
-        add("pupitre.title",        "PUPITRE A22",                         "PUPITRE A22")
+        // "Manual Control Console A22" is the STS parts-list name; the
+        // French cab calls it the pupitre. T/F is the physical marking on
+        // the manipulateur (traction/freinage) in both modes, like KG,
+        // KACOP and AV/0/AR.
+        add("pupitre.title",        "CONSOLE A22",                         "PUPITRE A22")
         add("pupitre.reverser",     "REVERSER",                            "INVERSEUR")
-        add("pupitre.lever",        "T/B LEVER (F = brake, T = traction)", "MANIPULATEUR T/F (F = frein, T = traction)")
+        add("pupitre.lever",        "T/F LEVER",                           "MANIPULATEUR T/F")
         add("pupitre.kacop.warning","VIGILANCE!",                          "VIGILANCE !")
         add("pupitre.vigilance",    "Vigilance timer",                     "Temporisation vigilance")
-        add("pupitre.traction.inhibited","Traction inhibited (KG / reverser / doors / FU)",
+        add("pupitre.traction.inhibited","Traction inhibited (KG / reverser / doors / EB)",
                                     "Traction inhibée (KG / inverseur / portes / FU)")
         add("pupitre.covered",      "Cab cover locked -- automatic driving","Capot verrouillé -- pilotage automatique")
         add("detail.sec.pupitre",   "MANUAL DRIVING -- CONSOLE A22",       "CONDUITE MANUELLE -- PUPITRE A22")
         add("detail.atp.program",   "Speed program",                       "Programme de vitesse")
-        add("detail.atp.ebcause",   "FU cause",                            "Cause FU")
+        add("detail.atp.ebcause",   "EB cause",                            "Cause FU")
+        // Cab voyants whose markings translate per the domain-acronym
+        // convention (FR PM/URG <-> EN MAN/EB); TRAC, KACOP, KG are
+        // identical in both modes.
+        add("pupitre.voyant.pm",    "MAN",                                 "PM")
+        add("pupitre.voyant.urg",   "EB",                                  "URG")
         add("train.faults.label",   "FAULT INJECTION",                     "INJECTION DE DÉFAUTS")
         add("train.manual.speed",   "MANUAL SPEED",                        "VITESSE MANUELLE")
         add("train.tires.label",    "TIRES",                               "PNEUS")
@@ -899,8 +908,8 @@ enum Strings {
                                     "%%SET-S-KACOP, vigilance acquittée sur la rame %@\n")
         // VALCP SHOW RAME rows (VAL fixed-block telemetry).
         add("valcp.rame.program",   "  Speed program:  ",                  "  Programme :     ")
-        add("valcp.rame.ebcause",   "FU cause:",                           "cause FU :")
-        add("valcp.rame.pupitre",   "  Pupitre A22:    KG %@   reverser %@   lever %+.0f%%   KACOP %.1f s",
+        add("valcp.rame.ebcause",   "EB cause:",                           "cause FU :")
+        add("valcp.rame.pupitre",   "  Console A22:    KG %@   reverser %@   lever %+.0f%%   KACOP %.1f s",
                                     "  Pupitre A22 :   KG %@   inverseur %@   manip. %+.0f %%   KACOP %.1f s")
         add("valcp.rame.pneu.range","%%SET-W-IVPNEU, tire index must be 1..%d\n",
                                     "%%SET-W-IVPNEU, l'index du pneu doit être 1..%d\n")

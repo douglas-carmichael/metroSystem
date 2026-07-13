@@ -480,12 +480,16 @@ private struct PupitreSection: View {
         BoxPanel(title: language.t("detail.sec.pupitre"),
                  accent: train.mode == .manual ? RetroTheme.cyan : RetroTheme.amberDim) {
             VStack(alignment: .leading, spacing: 6) {
-                // Voyants (per the cab lamp panel).
+                // Voyants (per the cab lamp panel). TRAC and KACOP read
+                // the same in both languages; the others follow the
+                // domain-acronym convention (FREIN/PM/URG <-> BRAKE/MAN/EB).
                 HStack(spacing: 10) {
                     voyant("TRAC", train.pupitreLever > 0.02 && driving, RetroTheme.green)
-                    voyant("FREIN", train.pupitreLever < -0.02, RetroTheme.amber)
-                    voyant("PM", train.mode == .manual && train.pupitreKG && train.pupitreReverser != 0, RetroTheme.cyan)
-                    voyant("URG", train.isEmergencyBrakeApplied, .red)
+                    voyant(language.t("fault.frein"), train.pupitreLever < -0.02, RetroTheme.amber)
+                    voyant(language.t("pupitre.voyant.pm"),
+                           train.mode == .manual && train.pupitreKG && train.pupitreReverser != 0,
+                           RetroTheme.cyan)
+                    voyant(language.t("pupitre.voyant.urg"), train.isEmergencyBrakeApplied, .red)
                     voyant("KACOP", train.kacopWarning, .red)
                 }
                 HRule(RetroTheme.amberDim)
