@@ -242,12 +242,18 @@ private struct StatusStrip: View {
             StatusLine(label: language.t("status.modbus"),
                        value: modbusValue,
                        valueColor: modbus.displayedClientCount == 0 ? RetroTheme.amberDim : RetroTheme.green)
+            // MODE and ALARMES change text on their own (line mode,
+            // alarm raise/return-to-normal): reserve their widest
+            // realistic width so the STAT item and cursor to their right
+            // hold still instead of jittering with every transition.
             StatusLine(label: language.t("status.mode"),
                        value: modeValue,
                        valueColor: modeColor)
+                .frame(minWidth: 200, alignment: .leading)
             StatusLine(label: language.t("status.alarms"),
                        value: alarmValue,
                        valueColor: alarmColor)
+                .frame(minWidth: 190, alignment: .leading)
             StatusLine(label: "STAT",
                        value: language.t("status.ready"),
                        valueColor: RetroTheme.green)
@@ -564,8 +570,15 @@ private struct SCADAAlarmPanel: View {
                              message: Strings.lookup(pick.messageKey, lang: .en))
     }
 
+    /// The annunciator holds a FIXED five-row page, like a real SCADA
+    /// alarm summary: empty slots render as dim placeholders instead of
+    /// collapsing, so the panel never changes height and the rame panels
+    /// below don't reflow when an alarm raises or returns to normal.
+    private static let annunciatorRows = 5
+
     private var alarmTable: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let active = Array(world.activeAlarms.prefix(Self.annunciatorRows))
+        return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 0) {
                 header(language.t("alarm.col.id"), width: 42)
                 header(language.t("alarm.col.sev"), width: 84)
@@ -575,16 +588,27 @@ private struct SCADAAlarmPanel: View {
                 header(language.t("alarm.col.message"), width: nil)
             }
             HRule(RetroTheme.amberDim)
-            if world.activeAlarms.isEmpty {
-                Text(language.t("alarm.none.active"))
-                    .font(RetroTheme.mono)
-                    .foregroundColor(RetroTheme.green)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                ForEach(Array(world.activeAlarms.prefix(5))) { alarm in
-                    AlarmRow(alarm: alarm)
+            ForEach(0..<Self.annunciatorRows, id: \.self) { slot in
+                if slot < active.count {
+                    AlarmRow(alarm: active[slot])
+                } else {
+                    placeholderRow(showEmptyBanner: slot == 0 && active.isEmpty)
                 }
             }
+        }
+    }
+
+    /// An empty annunciator slot. Carries a hidden ACK button so its
+    /// intrinsic height matches a live AlarmRow exactly -- the fixed page
+    /// depends on every slot measuring the same.
+    private func placeholderRow(showEmptyBanner: Bool) -> some View {
+        HStack(spacing: 0) {
+            Text(showEmptyBanner ? language.t("alarm.none.active") : "····")
+                .font(RetroTheme.monoSm)
+                .foregroundColor(showEmptyBanner ? RetroTheme.green : RetroTheme.amberDim.opacity(0.4))
+            Spacer(minLength: 8)
+            RetroButton(language.t("alarm.ack"), enabled: false) {}
+                .hidden()
         }
     }
 
