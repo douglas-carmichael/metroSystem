@@ -392,12 +392,16 @@ extension HelpLibrary {
   layered product; see HELP VALCP for the full reference.
 
     $ VALCP SET RAME 101 /MANUAL     ! conduite manuelle limitée
-    $ VALCP SET RAME 101 /SPEED=8    ! request 8 m/s from the driver desk
-    $ VALCP SET RAME 101 /SPEED=0    ! brake to a stand
+    $ VALCP SET RAME 101 /KG=ON      ! console A22: master power on
+    $ VALCP SET RAME 101 /REVERSER=AV ! point the reverser forward
+    $ VALCP SET RAME 101 /LEVER=50   ! 50% traction on the T/F lever
+    $ VALCP SET RAME 101 /KACOP      ! acknowledge the dead-man (14 s!)
+    $ VALCP SET RAME 101 /LEVER=-100 ! full service brake
+    $ VALCP SET RAME 101 /SPEED=8    ! cap the CML governor at 8 m/s
     $ OPEN RAME 101                  ! open the doors
     $ CLOSE RAME 101                 ! close the doors
     $ STOP RAME 101                  ! command the FU (emergency brake)
-    $ START RAME 101                 ! release the FU
+    $ START RAME 101                 ! release the FU (at a stand)
     $ VALCP SET RAME 101 /AUTOMATIC  ! back to conduite automatique
     $ VALCP SET LIGNE /SP=(1,3,60)   ! shuttle CHU <-> Gare, 60 s headway
     $ VALCP SET LIGNE /NORMAL        ! full-line service restored
@@ -620,10 +624,19 @@ extension HelpLibrary {
 
 3 RAME
   Sets the operating attributes of a single rame. Fault qualifiers
-  accept both the French and English spellings.
+  accept both the French and English spellings. Under the VAL backend
+  manual driving runs from the console-A22 pupitre: KG (master power),
+  the reverser, the traction/brake lever and the KACOP dead-man
+  (acknowledge within 14 s or the FU trips at 20 s); /SPEED caps the
+  CML governor. The wayside AVP stays active in manual -- penetrating
+  an occupied block trips the FU after 10 m.
 
     VALCP SET RAME label /MANUAL | /AUTOMATIC | /SPEED=m/s
                          /FU=ON|OFF
+                         /KG=ON|OFF
+                         /REVERSER=AV|0|AR (/INVERSEUR)
+                         /LEVER=-100..100  (/MANIPULATEUR, percent)
+                         /KACOP
                          /PORTES=ON|OFF   (/DOOR)
                          /TRACTION=ON|OFF (/ENGINE)
                          /FREIN=ON|OFF    (/BRAKE)
@@ -1071,12 +1084,14 @@ extension HelpLibrary {
 
 2 BACKEND
   Switches the state backend the front end is a window onto: the
-  self-contained VAL simulation (the default), the simulated PRATIC
-  moving-block CBTC network, or the real PRATIC network supervised over
-  a telemetry transport. Switching replaces the locally-owned fleet;
-  trains owned by peer nodes are untouched.
+  fixed-block VAL simulation (the default -- wayside SF/PP speed
+  programs, on-board AVP/AVO racks, console-A22 manual driving), the
+  moving-block CBTC simulation (continuous movement authority), the
+  simulated PRATIC moving-block network, or the real PRATIC network
+  supervised over a telemetry transport. Switching replaces the
+  locally-owned fleet; trains owned by peer nodes are untouched.
 
-    SET BACKEND {VAL | PRATIC_SIM | PRATIC_HW}
+    SET BACKEND {VAL | CBTC_SIM | PRATIC_SIM | PRATIC_HW}
 
 2 PRATIC
   Dispatcher controls for the active PRATIC backend: movement-authority
@@ -1197,9 +1212,10 @@ extension HelpLibrary {
     SHOW HARDWARE
 
 2 BACKEND
-  Displays the available state backends (VAL simulation, PRATIC
-  simulation, PRATIC hardware) and which one is active, plus the
-  telemetry-transport health when a PRATIC backend is running.
+  Displays the available state backends (fixed-block VAL, moving-block
+  CBTC simulation, PRATIC simulation, PRATIC hardware) and which one is
+  active, plus the telemetry-transport health when a PRATIC backend is
+  running.
 
     SHOW BACKEND
 

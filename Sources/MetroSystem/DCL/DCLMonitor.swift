@@ -596,13 +596,17 @@ extension DCLEngine {
 
     /// Firmware-side English state mnemonics -- MONITOR is in-universe VMS
     /// system output, so these do not localize (the Dynamics window shows
-    /// the same regimes localized).
+    /// the same regimes localized). Under the VAL backend the perturbed
+    /// stopping program reads PERT while it is actually slowing the rame.
     private func dynamicsState(for train: Train) -> String {
         if train.isEmergencyBrakeApplied || train.status == .emergency { return "EB" }
         if train.doorsOpen { return "DWELL" }
         if train.isDepartureHold { return "HOLD" }
         if train.mode == .manual { return "MANUAL" }
         if train.status == .stopped { return abs(train.speed) > 0.05 ? "STOPPING" : "IDLE" }
+        if train.speedProgram == VALSpeedProgram.perturbed.rawValue && train.speedError < -0.1 {
+            return "PERT"
+        }
         let cruising = train.speed >= train.consigneVitesse * 0.95 && train.consigneVitesse > 0.5
         if train.speedError < -0.3 { return "DECEL" }
         if cruising                { return "CRUISE" }

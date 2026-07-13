@@ -722,6 +722,20 @@ private struct TrainPanel: View {
                     StatusLine(label: language.t("train.status"),
                                value: statusString,
                                valueColor: statusColor)
+                    // VAL fixed-block telemetry: received speed program,
+                    // and the trip cause while the FU is in. Mnemonics are
+                    // firmware identifiers, shared across both languages.
+                    if let program = VALSpeedProgram(rawValue: train.speedProgram) {
+                        StatusLine(label: language.t("train.program"),
+                                   value: program.mnemonic,
+                                   valueColor: program == .perturbed ? RetroTheme.amberBright : RetroTheme.green)
+                        if train.isEmergencyBrakeApplied,
+                           let cause = VALTripCause(rawValue: train.ebCause), cause != .none {
+                            StatusLine(label: language.t("train.ebcause"),
+                                       value: cause.mnemonic,
+                                       valueColor: .red)
+                        }
+                    }
                     if !faultString.isEmpty {
                         StatusLine(label: language.t("train.faults"),
                                    value: faultString,
@@ -748,7 +762,14 @@ private struct TrainPanel: View {
                     }
                 }
                 if train.mode == .manual && network.canControl(train) {
-                    ManualSpeedControls(train: train)
+                    // Under the VAL backend, manual driving is the full
+                    // console-A22 pupitre; the CBTC/PRATIC backends keep
+                    // the plain speed-setpoint chips.
+                    if train.speedProgram.isEmpty {
+                        ManualSpeedControls(train: train)
+                    } else {
+                        PupitreControls(train: train)
+                    }
                 }
                 // Physical-condition controls model the owning node's
                 // rolling stock; they stay owner-only (the wire carries no
@@ -887,6 +908,81 @@ private struct ManualSpeedControls: View {
                 .foregroundColor(RetroTheme.amberDim)
             Spacer()
         }
+    }
+}
+
+/// Console A22 -- the pupitre de conduite manuelle, shown when a rame
+/// under the VAL backend is in manual mode. KG / reverser / traction-
+/// brake lever / KACOP route through the peer link like every other
+/// exploitation control; the speed chips set the CML ceiling. Labels
+/// KG, KACOP, AV/0/AR are real cab markings -- identical in both
+/// languages.
+private struct PupitreControls: View {
+    let train: Train
+    @EnvironmentObject var network: PeerNetwork
+    @EnvironmentObject var language: AppLanguage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("\(language.t("pupitre.title")):")
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(RetroTheme.cyan)
+                RetroButton("KG", highlighted: train.pupitreKG) {
+                    _ = network.control(train, .pupitreKG, value: train.pupitreKG ? 0 : 1)
+                }
+                Text("\(language.t("pupitre.reverser")):")
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(RetroTheme.amberDim)
+                ForEach([(1, "AV"), (0, "0"), (-1, "AR")], id: \.0) { value, label in
+                    RetroButton(label, highlighted: train.pupitreReverser == value) {
+                        _ = network.control(train, .pupitreReverser, value: Double(value))
+                    }
+                }
+                RetroButton(kacopLabel, highlighted: train.kacopWarning) {
+                    _ = network.control(train, .kacopAck)
+                }
+                if train.kacopWarning {
+                    Text(language.t("pupitre.kacop.warning"))
+                        .font(RetroTheme.monoSm)
+                        .foregroundColor(.red)
+                        .retroGlow()
+                }
+                Spacer()
+            }
+            HStack(spacing: 6) {
+                Text("\(language.t("pupitre.lever")):")
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(RetroTheme.amberDim)
+                ForEach([(-100, "-100"), (-50, "-50"), (0, "0"), (25, "+25"),
+                         (50, "+50"), (100, "+100")], id: \.0) { pct, label in
+                    RetroButton(label,
+                                highlighted: abs(train.pupitreLever * 100 - Double(pct)) < 5) {
+                        _ = network.control(train, .pupitreLever, value: Double(pct) / 100.0)
+                    }
+                }
+                Text("%")
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(RetroTheme.amberDim)
+                Text("\(language.t("train.manual.speed")):")
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(RetroTheme.amberDim)
+                ForEach([8.0, 12.0, 20.0], id: \.self) { value in
+                    RetroButton(String(format: "%.0f", value),
+                                highlighted: abs(train.manualSpeedRequest - value) < 0.1) {
+                        _ = network.control(train, .setSpeed, value: value)
+                    }
+                }
+                Spacer()
+            }
+        }
+    }
+
+    /// KACOP chip label with the vigilance countdown while it runs.
+    private var kacopLabel: String {
+        guard train.pupitreKG else { return "KACOP" }
+        let remaining = max(0, Sim.kacopTripDelay - train.kacopSecondsSinceAck)
+        return String(format: "KACOP %2.0f", remaining)
     }
 }
 

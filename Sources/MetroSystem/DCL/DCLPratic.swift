@@ -29,8 +29,9 @@ extension DCLEngine {
         return s
     }
 
-    /// SET BACKEND VAL | PRATIC_SIM | PRATIC_HW
-    /// (PRATIC and SIM select the simulation; HW / HARDWARE the real one.)
+    /// SET BACKEND VAL | CBTC_SIM | PRATIC_SIM | PRATIC_HW
+    /// (PRATIC and SIM select the PRATIC simulation; HW / HARDWARE the
+    /// real network; CBTC the moving-block scan.)
     func setBackend(_ cmd: Parsed) -> String {
         guard let arg = cmd.positional.dropFirst().first?.uppercased() else {
             return tr("backend.set.usage") + "\n"
@@ -42,6 +43,8 @@ extension DCLEngine {
         switch arg {
         case "VAL":
             kind = .val
+        case "CBTC", "CBTC_SIM", "MOVING_BLOCK":
+            kind = .cbtcSim
         case "PRATIC", "PRATIC_SIM", "SIM", "SIMULATION":
             kind = .praticSim
         case "PRATIC_HW", "HW", "HARDWARE":

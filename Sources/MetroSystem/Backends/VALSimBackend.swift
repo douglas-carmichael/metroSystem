@@ -1,31 +1,47 @@
 import Foundation
 
-/// The classic VAL simulation, extracted from MetroWorld so all three
-/// backends are peers behind BackendManager: MetroWorld is the state
-/// store every surface renders, and THIS is the engine that puts VAL
-/// state into it. The scan is byte-for-byte the physics MetroWorld used
-/// to tick itself -- a 60 Hz PLC-style cyclic pass:
+/// The VAL backend, rebuilt around the architecture of the real system
+/// (UMTA/DOT interim assessment UMTA-MA-06-0069-81-3; Verhille's VAL 206
+/// thesis; STS board nomenclature). MetroWorld stays the store every
+/// surface renders -- THIS engine puts VAL state into it, one 60 Hz
+/// cyclic scan structured like the real equipment split:
 ///
-///   1. computeMovementAuthorities()  the wayside ZC pass
-///   2. enforceServiceProvisoire()    terminus reversal + headway holds
-///   3. advance() per local rame      the on-board (OBCU) logic
-///      / deadReckon() per remote     interpolate between peer snapshots
-///   4. alarm samplers                process-driven SCADA points
+///   1. VALWayside      the PA fixe: block occupancy detection (PD/ND),
+///                      WCU speed-program selection (SF normal / PP
+///                      perturbed / SF withdrawn), DOCU dwell + departure
+///                      authorization + SP turnback -- one uplink
+///                      telegram per locally-owned rame.
+///   2. VALOnboard      the PA embarqué per rame: SAFETY rack (AVP trips
+///                      holding off the FU), DRIVE rack (jerk-limited
+///                      speed regulation, B1/B2/B3 station stops), or
+///                      console A22 (manual driving with KACOP).
+///   3. VALTractionChain the HR car: image-série chopper/motor model,
+///                      brake blending, per-bogie adhesion + anti-skid,
+///                      Davis resistance -- integrates the physics.
+///   4. Alarm samplers  process-driven SCADA points, plus the vigilance
+///                      and program-mnemonic telemetry.
 ///
-/// CBTC DISPATCH SIMULATOR, NOT A SAFETY CONTROLLER: real installations
-/// (IEEE 1474.1 / EN 62290) run vital, redundant processors with
-/// hardware voting; this models the behaviour so the PCC panels and
-/// SCADA log read like the real thing, but nothing here is approved to
-/// move a train. (ClusterDaemon's RameSimulator mirrors this scan -- a
-/// behavioural change here should be reflected there.)
+/// Remote (peer-owned) rames are dead-reckoned between `.state`
+/// snapshots and feed the occupancy picture as obstacles -- exactly one
+/// authority per train, computed by its owner.
+///
+/// DISPATCH SIMULATOR, NOT A SAFETY CONTROLLER: the real AVP runs
+/// fail-safe redundant strings with hardware comparison; nothing here is
+/// approved to move a train.
 @MainActor
 final class VALSimBackend: MetroBackendEngine {
     private weak var world: MetroWorld?
     private var timer: Timer?
     private var lastTickAt: Date = .init()
     private var doorOpenSince: [UUID: Date] = [:]
-    /// SP interval pacing: last departure timestamp per terminus station.
-    private var lastTerminusDeparture: [Int: Date] = [:]
+
+    private let wayside = VALWayside()
+    private let onboard = VALOnboard()
+    private let traction = VALTractionChain()
+
+    /// Backend-private OBCU/traction state per locally-owned rame.
+    private var obcuState: [UUID: VALOnboardState] = [:]
+    private var hadActiveSP = false
 
     init(world: MetroWorld) {
         self.world = world
@@ -54,25 +70,51 @@ final class VALSimBackend: MetroBackendEngine {
         let dt = min(0.1, now.timeIntervalSince(lastTickAt))
         lastTickAt = now
 
-        computeMovementAuthorities(world: world)
-        enforceServiceProvisoire(world: world, now: now)
+        // SP cleared since last scan: reset the DOCU departure clocks.
+        if hadActiveSP && world.activeSP == nil {
+            wayside.clearDepartureClocks()
+        }
+        hadActiveSP = world.activeSP != nil
+
+        // 1. Vehicle detection: every known rame occupies its blocks.
+        let occupancy = wayside.detectOccupancy(trains: world.trains)
+        let controllerAlarm = motionInhibitedByAlarm(world: world)
 
         for index in world.trains.indices {
             if world.trains[index].ownerPeerId == world.localPeerId {
-                advance(&world.trains[index], dt: dt, world: world)
+                let id = world.trains[index].id
+                var state = obcuState[id] ?? VALOnboardState()
+
+                // 2. Uplink telegram from the wayside.
+                let telegram = wayside.telegram(for: world.trains[index],
+                                                occupancy: occupancy,
+                                                world: world, now: now)
+
+                // 3. OBCU scan (safety + drive/pupitre)...
+                let request = onboard.scan(&world.trains[index], state: &state,
+                                           telegram: telegram, world: world,
+                                           controllerAlarm: controllerAlarm, dt: dt)
+
+                // ...and the traction chain integrates the physics.
+                traction.integrate(&world.trains[index], state: &state,
+                                   request: request, dt: dt)
+
+                updateAuxiliaries(&world.trains[index], dt: dt)
+                obcuState[id] = state
             } else {
                 deadReckon(&world.trains[index], dt: dt)
             }
         }
 
+        // Drop OBCU state for withdrawn rames.
+        let liveIds = Set(world.trains.map(\.id))
+        obcuState = obcuState.filter { liveIds.contains($0.key) }
+
         sampleSystemAlarms(world: world)
         sampleTrainAlarms(world: world, at: now)
     }
 
-    /// Dead-reckon a peer-owned rame between `.state` snapshots: integrate
-    /// the last reported speed along its running direction. At the daemon's
-    /// default 60 Hz broadcast the snapshots dominate; at lower rates this
-    /// keeps motion smooth instead of stepping.
+    /// Dead-reckon a peer-owned rame between `.state` snapshots.
     private func deadReckon(_ train: inout Train, dt: Double) {
         guard train.speed > 0.01 else { return }
         train.position += train.speed * train.travelDirection.rawValue * dt
@@ -80,369 +122,26 @@ final class VALSimBackend: MetroBackendEngine {
         if train.position < 0 { train.position += Sim.trackLength }
     }
 
-    /// Zone-controller pass: each locally-owned train's LMA is the tail of
-    /// the train ahead (local OR remote) minus the safety margin, or an SP
-    /// virtual barrier when one is closer. Direction-aware so reversed
-    /// shuttles brake toward the correct barrier. Peer-owned trains are
-    /// obstacles only -- their own node computes their authority.
-    private func computeMovementAuthorities(world: MetroWorld) {
-        let trackLength = Sim.trackLength
-        let snapshot = world.trains
-
-        for me in snapshot where me.ownerPeerId == world.localPeerId {
-            var minDist = Double.greatestFiniteMagnitude
-            var obstaclePos: Double? = nil
-            var isSPBarrier = false
-
-            for other in snapshot where other.id != me.id {
-                var d: Double = me.travelDirection == .forward
-                    ? other.position - me.position
-                    : me.position - other.position
-                if d <= 0 { d += trackLength }
-                if d < minDist {
-                    minDist = d
-                    obstaclePos = other.position
-                }
-            }
-
-            var stranded = false
-            if let sp = world.activeSP {
-                stranded = world.isStranded(me, sp: sp)
-                if !stranded {
-                    let barriers = [sp.startStationId, sp.endStationId]
-                        .compactMap { sid in world.stations.first(where: { $0.id == sid })?.position }
-                    for barrier in barriers {
-                        var d: Double = me.travelDirection == .forward
-                            ? barrier - me.position
-                            : me.position - barrier
-                        if d <= 0 { d += trackLength }
-                        if d <= minDist + 0.1 {
-                            minDist = d
-                            obstaclePos = barrier
-                            isSPBarrier = true
-                        }
-                    }
-                }
-            }
-
-            var ma: Double
-            if stranded {
-                ma = me.position                       // vital stop in place
-            } else if let leaderPos = obstaclePos {
-                let margin = isSPBarrier ? 0.0 : Sim.safetyMargin
-                if me.travelDirection == .forward {
-                    ma = leaderPos - margin
-                    if ma < 0 { ma += trackLength }
-                } else {
-                    ma = (leaderPos + margin).truncatingRemainder(dividingBy: trackLength)
-                }
-            } else {
-                // Line to itself all the way around.
-                if me.travelDirection == .forward {
-                    ma = (me.position + trackLength - Sim.safetyMargin)
-                        .truncatingRemainder(dividingBy: trackLength)
-                } else {
-                    ma = me.position - trackLength + Sim.safetyMargin
-                    if ma < 0 { ma += trackLength }
-                }
-            }
-
-            // Direct write (not mutate): the MA refresh happens every scan
-            // for every local train; broadcasting it as an operator event
-            // would flood the wire. The periodic state rebroadcast carries it.
-            if let idx = world.trains.firstIndex(where: { $0.id == me.id }) {
-                world.trains[idx].movementAuthority = ma
-                world.trains[idx].targetSpeed = Sim.lineSpeed
-            }
-        }
+    /// A latched SYS/CONTROLLER fault (PCC watchdog) freezes every local
+    /// rame, like a controller-fault interlock in a real DCS.
+    private func motionInhibitedByAlarm(world: MetroWorld) -> Bool {
+        world.alarmLog.contains { $0.isActive && $0.source == "SYS" && $0.point == "CONTROLLER" }
     }
 
-    /// SP shuttle behaviour: reverse a rame docked at a terminus pointing
-    /// at the barrier, and pace departures from the termini to the
-    /// configured headway. Locally-owned rames only.
-    private func enforceServiceProvisoire(world: MetroWorld, now: Date) {
-        guard let sp = world.activeSP else {
-            for t in world.locallyOwned() where t.isDepartureHold {
-                world.mutate(t.id) { $0.isDepartureHold = false }
-            }
-            lastTerminusDeparture.removeAll()
-            return
-        }
-        for t in world.locallyOwned() {
-            if t.status == .docked, t.speed == 0, t.paxRemaining == 0, !world.isStranded(t, sp: sp) {
-                if (t.lastServicedStationId == sp.startStationId && t.travelDirection == .reverse) ||
-                   (t.lastServicedStationId == sp.endStationId && t.travelDirection == .forward) {
-                    world.mutate(t.id) { tr in
-                        tr.travelDirection = tr.travelDirection == .forward ? .reverse : .forward
-                        tr.speed = 0
-                        tr.movementAuthority = tr.position
-                    }
-                }
-            }
-            let atTerminus = t.status == .docked &&
-                (t.lastServicedStationId == sp.startStationId || t.lastServicedStationId == sp.endStationId)
-            if atTerminus, let stationId = t.lastServicedStationId {
-                let lastDep = lastTerminusDeparture[stationId] ?? .distantPast
-                if now.timeIntervalSince(lastDep) < sp.intervalle && lastDep != .distantPast {
-                    if !t.isDepartureHold { world.mutate(t.id) { $0.isDepartureHold = true } }
-                } else {
-                    if t.dwellRemaining <= 0 { lastTerminusDeparture[stationId] = now }
-                    if t.isDepartureHold { world.mutate(t.id) { $0.isDepartureHold = false } }
-                }
-            } else if t.isDepartureHold {
-                world.mutate(t.id) { $0.isDepartureHold = false }
-            }
-        }
-    }
+    // MARK: -- auxiliary telemetry (unchanged behaviour)
 
-    // MARK: -- per-train scan (OBCU logic)
-
-    private func advance(_ train: inout Train, dt: Double, world: MetroWorld) {
-        let trackLength = Sim.trackLength
-
-        var effectiveDistToMA = directedDistance(to: train.movementAuthority, train: train)
-        if effectiveDistToMA < 0 { effectiveDistToMA += trackLength }
-
-        // Vital overrides: FU, door fault, brake fault, controller-freeze
-        // alarm, line-wide emergency -- maximum-rate brake to a stand.
-        if train.isDoorFault || train.isBrakeFault || train.isEmergencyBrakeApplied ||
-           world.isEmergencyStopped || motionInhibitedByAlarm(world: world) {
-            train.status = .emergency
-            train.distanceToMA = effectiveDistToMA
-            applyPhysics(&train, acceleration: -Sim.emergencyBraking, trackLength: trackLength)
-            updateAuxiliaries(&train, dt: dt)
-            return
-        }
-
-        // Line service off: brake to a stand and hold.
-        if !world.isRunning {
-            if train.speed > 0 {
-                applyPhysics(&train, acceleration: -Sim.nominalBraking, trackLength: trackLength)
-            } else {
-                train.acceleration = 0
-                train.status = train.isDwelling ? .docked : .stopped
-            }
-            train.distanceToMA = effectiveDistToMA
-            updateAuxiliaries(&train, dt: dt)
-            return
-        }
-
-        // Manual driving (conduite manuelle limitée).
-        if train.mode == .manual {
-            if train.doorsOpen {
-                train.status = train.speed > 0 ? .moving : .docked
-                applyPhysics(&train, acceleration: train.speed > 0 ? -Sim.emergencyBraking : 0, trackLength: trackLength)
-            } else {
-                let target = min(train.manualSpeedRequest, Sim.manualSpeedMax)
-                var desiredAcc: Double = 0
-                if train.speed < target { desiredAcc = Sim.maxAcceleration }
-                else if train.speed > target { desiredAcc = -Sim.emergencyBraking }
-                if train.isEngineFault {
-                    desiredAcc = train.speed > 0 ? -0.1 : 0
-                }
-                train.status = train.speed > 0 ? .moving : .stopped
-                applyPhysics(&train, acceleration: applyAdhesion(desiredAcc, train: train), trackLength: trackLength)
-            }
-            train.distanceToMA = effectiveDistToMA
-            updateAuxiliaries(&train, dt: dt)
-            return
-        }
-
-        // Station dwell (à quai, doors open, passenger exchange).
-        if train.isDwelling {
-            train.dwellRemaining -= dt
-            if train.dwellRemaining <= 0 {
-                train.passengerCount = max(0, train.passengerCount + train.paxRemaining)
-                train.paxRemaining = 0
-                train.dwellRemaining = 0
-                if !train.isDepartureHold {
-                    train.isDwelling = false
-                    train.doorsOpen = false
-                    train.status = .moving
-                    train.lastPaxChange = 0
-                    train.paxBoarding = 0
-                    train.paxAlighting = 0
-                }
-            } else {
-                if train.paxRemaining != 0 {
-                    train.paxExchangeTimer -= dt
-                    if train.paxExchangeTimer <= 0 {
-                        if train.paxRemaining > 0 {
-                            train.passengerCount += 1
-                            train.paxRemaining -= 1
-                        } else {
-                            train.passengerCount = max(0, train.passengerCount - 1)
-                            train.paxRemaining += 1
-                        }
-                        train.paxExchangeTimer = train.paxExchangeInterval
-                    }
-                }
-                train.status = .docked
-                train.speed = 0
-                train.acceleration = 0
-                train.distanceToMA = effectiveDistToMA
-                updateAuxiliaries(&train, dt: dt)
-                return
-            }
-        }
-
-        // Target-station resolution: nearest unserviced stop marker within
-        // the approach window becomes the stopping target if it's closer
-        // than the ZC's authority.
-        let servedStations = world.activeStations()
-        var distToStop: Double? = nil
-        var targetStationId: Int? = nil
-        for station in servedStations where train.lastServicedStationId != station.id {
-            let d = directedDistance(to: station.position, train: train)
-            if d >= -5.0 && d < Sim.stationApproachWindow {
-                if distToStop == nil || d < distToStop! {
-                    distToStop = d
-                    targetStationId = station.id
-                }
-            }
-        }
-
-        if let nextId = targetStationId {
-            train.nextStationName = world.stationName(id: nextId)
-        }
-
-        if let dist = distToStop, let stationId = targetStationId {
-            if dist < effectiveDistToMA { effectiveDistToMA = dist }
-            if dist <= Sim.stationStopTolerance && abs(train.speed) < 0.1 {
-                beginDwell(&train, stationId: stationId)
-                train.distanceToMA = effectiveDistToMA
-                updateAuxiliaries(&train, dt: dt)
-                return
-            }
-        } else if let lastId = train.lastServicedStationId,
-                  let lastStation = world.stations.first(where: { $0.id == lastId }) {
-            let d = directedDistance(to: lastStation.position, train: train)
-            if d > 200 { train.lastServicedStationId = nil }
-        }
-
-        // Signal fault: the rame loses its radio MA -- ATP collapses the
-        // authority to zero and the braking curve stops the train.
-        if train.isSignalFault { effectiveDistToMA = 0 }
-
-        // Asservissement (speed regulation): braking-curve target speed,
-        // proportional control, vital FU envelope, adhesion model.
-        var consigne: Double = 0
-        if effectiveDistToMA > Sim.maDistanceMargin {
-            let curve = (2 * Sim.nominalBraking * (effectiveDistToMA - Sim.maDistanceMargin)).squareRoot()
-            consigne = min(train.targetSpeed, curve)
-        }
-        let speedError = consigne - train.speed
-        var desiredAcc = speedError * 1.0          // Kp = 1.0
-
-        let safeBrakingDistance = (train.speed * train.speed) / (2 * Sim.emergencyBraking)
-        if effectiveDistToMA <= safeBrakingDistance + 0.5 {
-            desiredAcc = -Sim.emergencyBraking
-        }
-        if train.isEngineFault {
-            desiredAcc = min(desiredAcc, train.speed > 0 ? -0.1 : 0)
-        }
-        desiredAcc = max(-Sim.emergencyBraking, min(Sim.maxAcceleration, desiredAcc))
-
-        if abs(train.speed) < 0.05 && consigne < 0.1 {
-            train.status = .stopped
-            train.speed = 0
-            desiredAcc = 0
-        } else {
-            train.status = .moving
-        }
-
-        train.consigneVitesse = consigne
-        train.speedError = speedError
-        train.distanceToMA = effectiveDistToMA
-
-        applyPhysics(&train, acceleration: applyAdhesion(desiredAcc, train: train), trackLength: trackLength)
-        updateAuxiliaries(&train, dt: dt)
-    }
-
-    private func beginDwell(_ train: inout Train, stationId: Int) {
-        train.isDwelling = true
-        let dwell = Double.random(in: Sim.dwellMin...Sim.dwellMax)
-        train.dwellRemaining = dwell
-        train.doorsOpen = true
-        train.status = .docked
-        train.speed = 0
-        train.acceleration = 0
-        train.lastServicedStationId = stationId
-        // Passenger exchange as separate alighting (descente) then boarding
-        // (montée) flows so the detail screen can show both; the net change
-        // is what the dwell loop applies one-by-one to the load.
-        let alighting = Int.random(in: 0...min(Sim.paxAlightMax, train.passengerCount))
-        let headroom = max(0, Sim.paxCapacity - (train.passengerCount - alighting))
-        let boarding = Int.random(in: 0...min(Sim.paxBoardMax, headroom))
-        let change = boarding - alighting
-        train.paxBoarding = boarding
-        train.paxAlighting = alighting
-        train.lastPaxChange = change
-        train.paxRemaining = change
-        train.paxExchangeInterval = abs(change) > 0 ? (dwell * 0.6) / Double(abs(change)) : 1.0
-        train.paxExchangeTimer = 0
-    }
-
-    /// Tire-adhesion and patinage / enrayage model applied to the traction
-    /// or braking command.
-    private func applyAdhesion(_ desiredAcc: Double, train: Train) -> Double {
-        var final = desiredAcc
-        var adhesion = 0.0
-        var drag = 0.0
-        for tire in train.tires {
-            switch tire.status {
-            case .ok:          adhesion += 1.0
-            case .lowPressure: adhesion += 0.9; drag += 0.05
-            case .puncture:    adhesion += 0.5; drag += 0.2
-            case .burst:       adhesion += 0.1; drag += 0.5
-            }
-        }
-        let avg = adhesion / Double(max(1, train.tires.count))
-        final *= avg
-        if train.isPatinage && final > 0 { final *= 0.2 }
-        if train.isEnrayage && final < 0 { final *= 0.3 }
-        if train.speed > 0 {
-            final -= drag
-        } else if train.speed == 0 && final < drag {
-            final = max(final, 0) == 0 ? 0 : final - drag
-        }
-        return final
-    }
-
-    private func applyPhysics(_ train: inout Train, acceleration: Double, trackLength: Double) {
-        train.acceleration = acceleration
-        train.speed += acceleration * Sim.tickInterval
-        if train.speed < 0 { train.speed = 0 }
-        train.position += train.speed * train.travelDirection.rawValue * Sim.tickInterval
-        train.position = train.position.truncatingRemainder(dividingBy: trackLength)
-        if train.position < 0 { train.position += trackLength }
-    }
-
-    /// Direction-aware distance from the train to an absolute track point,
-    /// normalised to (-L/2, L/2].
-    private func directedDistance(to target: Double, train: Train) -> Double {
-        var d = target - train.position
-        if train.travelDirection == .reverse { d = train.position - target }
-        if d < -Sim.trackLength / 2 { d += Sim.trackLength }
-        else if d > Sim.trackLength / 2 { d -= Sim.trackLength }
-        return d
-    }
-
-    /// Synthetic-but-plausible auxiliary telemetry so the synoptic and DCL
-    /// SHOW RAME sheets read like a live TCMS.
+    /// Synthetic-but-plausible auxiliary telemetry so the synoptic and
+    /// DCL SHOW RAME sheets read like a live TCMS. Traction electrics
+    /// (line current, voltage, torque) are owned by VALTractionChain.
     private func updateAuxiliaries(_ train: inout Train, dt: Double) {
-        let motoring = train.acceleration > 0.05
         let braking = train.acceleration < -0.05
-        train.tractionCurrent = motoring ? min(1500, 400 + train.speed * 60) : (braking ? 120 : 40)
-        train.tractionTorque = max(-100, min(100, train.acceleration / Sim.maxAcceleration * 100))
-        train.mainVoltage = 750 - train.tractionCurrent * 0.02
         train.compressorPressure += (train.isCompressorRunning ? 0.08 : -0.01) * dt * 10
         if train.compressorPressure < 7.4 { train.isCompressorRunning = true }
         if train.compressorPressure > 9.0 { train.isCompressorRunning = false }
         train.compressorPressure = max(6.0, min(9.5, train.compressorPressure))
 
-        // Static converter (CVS): ~112 V DC low-voltage bus while the 750 V
-        // line is up; it sags if third-rail pickup collapses.
+        // Static converter (CVS): ~112 V DC low-voltage bus while the
+        // 750 V line is up; it sags if third-rail pickup collapses.
         train.cvsOutputVoltage = train.mainVoltage > 400
             ? 112.0 - (750 - train.mainVoltage) * 0.01
             : max(0, train.cvsOutputVoltage - 40 * dt)
@@ -489,6 +188,7 @@ final class VALSimBackend: MetroBackendEngine {
 
         for train in localTrains {
             let source = "RAME \(train.label)"
+            let state = obcuState[train.id] ?? VALOnboardState()
 
             sample(world, source, "OVERSPEED", train.isOverspeed, .critical, "alarm.msg.overspeed")
             sample(world, source, "MA_LIMIT", train.isMAEncroached, .critical, "alarm.msg.malimit")
@@ -497,8 +197,14 @@ final class VALSimBackend: MetroBackendEngine {
             sample(world, source, "TRACTION", train.isEngineFault, .major, "alarm.msg.enginefault")
             sample(world, source, "FREIN", train.isBrakeFault, .critical, "alarm.msg.brakefault")
             sample(world, source, "CTC_RADIO", train.isSignalFault, .major, "alarm.msg.signalfault")
-            sample(world, source, "PATINAGE", train.isPatinage, .advisory, "alarm.msg.patinage")
-            sample(world, source, "ENRAYAGE", train.isEnrayage, .advisory, "alarm.msg.enrayage")
+            // Wheel slip/slide: the injected wet-patch flags OR the
+            // adhesion model actually losing the wheels.
+            sample(world, source, "PATINAGE", train.isPatinage || state.traction.slipping,
+                   .advisory, "alarm.msg.patinage")
+            sample(world, source, "ENRAYAGE", train.isEnrayage || state.traction.sliding,
+                   .advisory, "alarm.msg.enrayage")
+            // KACOP vigilance warning (manual driving, dead-man overdue).
+            sample(world, source, "VIGILANCE", train.kacopWarning, .minor, "alarm.msg.kacop")
 
             switch train.worstTire {
             case .ok:
@@ -546,11 +252,5 @@ final class VALSimBackend: MetroBackendEngine {
         } else {
             world.clearAlarm(source: source, point: point)
         }
-    }
-
-    /// A latched SYS/CONTROLLER fault (PCC watchdog) freezes every local
-    /// rame, like a controller-fault interlock in a real DCS.
-    private func motionInhibitedByAlarm(world: MetroWorld) -> Bool {
-        world.alarmLog.contains { $0.isActive && $0.source == "SYS" && $0.point == "CONTROLLER" }
     }
 }

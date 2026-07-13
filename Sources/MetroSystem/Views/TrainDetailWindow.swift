@@ -60,6 +60,11 @@ struct TrainDetailWindow: View {
                 HStack(alignment: .top, spacing: 14) {
                     ATPSection(train: train)
                     AuxiliarySection(train: train)
+                    // Console A22 -- present only under the VAL backend
+                    // (the fixed-block engine stamps `speedProgram`).
+                    if !train.speedProgram.isEmpty {
+                        PupitreSection(train: train)
+                    }
                 }
                 ElectricalSynopticSection(train: train, editable: isLocal)
                 AuxControlsSection(train: train, editable: isLocal)
@@ -422,6 +427,19 @@ private struct ATPSection: View {
                 contact(language.t("detail.atp.chain"), chain.intact)
                 IndicatorRow(label: language.t("fault.ctc"),
                              active: train.isSignalFault, color: .red)
+                // VAL fixed-block program telemetry (mnemonics are
+                // firmware identifiers, shared across languages).
+                if let program = VALSpeedProgram(rawValue: train.speedProgram) {
+                    HRule(RetroTheme.amberDim)
+                    ValueRow(label: language.t("detail.atp.program"),
+                             value: program.mnemonic,
+                             color: program == .perturbed ? RetroTheme.amberBright : RetroTheme.green)
+                    if train.isEmergencyBrakeApplied,
+                       let cause = VALTripCause(rawValue: train.ebCause), cause != .none {
+                        ValueRow(label: language.t("detail.atp.ebcause"),
+                                 value: cause.mnemonic, color: .red)
+                    }
+                }
             }
             .frame(maxWidth: .infinity)
         }
@@ -441,6 +459,114 @@ private struct ATPSection: View {
                 .fill(healthy ? RetroTheme.green : Color.clear)
                 .overlay(Rectangle().stroke(healthy ? RetroTheme.green : .red, lineWidth: 1))
                 .frame(width: 9, height: 9)
+        }
+    }
+}
+
+/// Console A22 -- the manual-driving pupitre, live under the VAL
+/// backend. Displays the cab state for any rame; the controls engage
+/// when the rame is controllable and in manual mode (the cab cover is
+/// locked under automatic driving). Every control routes through the
+/// peer link like the PCC panel's. KG / KACOP / AV / 0 / AR are real cab
+/// markings -- language-neutral.
+private struct PupitreSection: View {
+    let train: Train
+    @EnvironmentObject var language: AppLanguage
+    @EnvironmentObject var network: PeerNetwork
+
+    private var driving: Bool { train.mode == .manual && network.canControl(train) }
+
+    var body: some View {
+        BoxPanel(title: language.t("detail.sec.pupitre"),
+                 accent: train.mode == .manual ? RetroTheme.cyan : RetroTheme.amberDim) {
+            VStack(alignment: .leading, spacing: 6) {
+                // Voyants (per the cab lamp panel).
+                HStack(spacing: 10) {
+                    voyant("TRAC", train.pupitreLever > 0.02 && driving, RetroTheme.green)
+                    voyant("FREIN", train.pupitreLever < -0.02, RetroTheme.amber)
+                    voyant("PM", train.mode == .manual && train.pupitreKG && train.pupitreReverser != 0, RetroTheme.cyan)
+                    voyant("URG", train.isEmergencyBrakeApplied, .red)
+                    voyant("KACOP", train.kacopWarning, .red)
+                }
+                HRule(RetroTheme.amberDim)
+                HStack(spacing: 8) {
+                    RetroButton("KG", enabled: driving, highlighted: train.pupitreKG) {
+                        _ = network.control(train, .pupitreKG, value: train.pupitreKG ? 0 : 1)
+                    }
+                    Text(language.t("pupitre.reverser"))
+                        .font(RetroTheme.monoSm)
+                        .foregroundColor(RetroTheme.amber)
+                    ForEach([(1, "AV"), (0, "0"), (-1, "AR")], id: \.0) { value, label in
+                        RetroButton(label, enabled: driving,
+                                    highlighted: train.pupitreReverser == value) {
+                            _ = network.control(train, .pupitreReverser, value: Double(value))
+                        }
+                    }
+                }
+                // Manipulateur traction/freinage: chips over the throw.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(language.t("pupitre.lever"))
+                        .font(RetroTheme.monoSm)
+                        .foregroundColor(RetroTheme.amber)
+                    HStack(spacing: 6) {
+                        ForEach([(-100, "F100"), (-50, "F50"), (-25, "F25"), (0, "0"),
+                                 (25, "T25"), (50, "T50"), (100, "T100")], id: \.0) { pct, label in
+                            RetroButton(label, enabled: driving && (pct <= 0 || tractionPermitted),
+                                        highlighted: abs(train.pupitreLever * 100 - Double(pct)) < 5) {
+                                _ = network.control(train, .pupitreLever, value: Double(pct) / 100.0)
+                            }
+                        }
+                    }
+                }
+                HRule(RetroTheme.amberDim)
+                HStack(spacing: 8) {
+                    RetroButton(kacopLabel, enabled: driving, highlighted: train.kacopWarning) {
+                        _ = network.control(train, .kacopAck)
+                    }
+                    ValueRow(label: language.t("pupitre.vigilance"),
+                             value: train.mode == .manual && train.pupitreKG
+                                 ? String(format: "%4.1f s", train.kacopSecondsSinceAck)
+                                 : "--",
+                             color: train.kacopWarning ? .red : RetroTheme.amberBright)
+                }
+                if train.mode == .manual && !tractionPermitted {
+                    Text(language.t("pupitre.traction.inhibited"))
+                        .font(RetroTheme.monoSm)
+                        .foregroundColor(RetroTheme.amberBright)
+                }
+                if !driving {
+                    Text(language.t(train.mode == .manual
+                                    ? "detail.controls.remote" : "pupitre.covered"))
+                        .font(RetroTheme.monoSm)
+                        .foregroundColor(RetroTheme.amberDim)
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// The cab's traction interlocks (KG, reverser, doors) -- braking is
+    /// always available, so only positive lever chips grey out.
+    private var tractionPermitted: Bool {
+        train.pupitreKG && train.pupitreReverser != 0 && !train.doorsOpen
+            && !train.isEmergencyBrakeApplied
+    }
+
+    private var kacopLabel: String {
+        guard train.mode == .manual && train.pupitreKG else { return "KACOP" }
+        let remaining = max(0, Sim.kacopTripDelay - train.kacopSecondsSinceAck)
+        return String(format: "KACOP %2.0f", remaining)
+    }
+
+    private func voyant(_ label: String, _ lit: Bool, _ color: Color) -> some View {
+        VStack(spacing: 2) {
+            Rectangle()
+                .fill(lit ? color : Color.clear)
+                .overlay(Rectangle().stroke(color, lineWidth: 1))
+                .frame(width: 22, height: 10)
+            Text(label)
+                .font(RetroTheme.monoSm)
+                .foregroundColor(lit ? color : RetroTheme.amberDim)
         }
     }
 }

@@ -23,17 +23,23 @@ enum PeerOp: String, Codable {
 
 /// The manipulations one node can request of another node's rame. Mirrors
 /// exactly the exploitation actions the operator can already perform on a
-/// locally-owned rame (doors, FU, driving mode, manual speed setpoint).
+/// locally-owned rame (doors, FU, driving mode, manual speed ceiling, and
+/// the console-A22 pupitre controls for VAL manual driving).
 /// Latched fault injection and tire state remain owner-only by design --
 /// they model physical conditions of the owning node's rolling stock.
 enum TrainCommandKind: String, Codable {
     case openDoors
     case closeDoors
     case fuSet          // command the emergency brake
-    case fuRelease      // release it
+    case fuRelease      // release it (honoured at a stand only)
     case modeAuto       // conduite automatique
     case modeManual     // conduite manuelle
-    case setSpeed       // manual-mode setpoint (value = m/s)
+    case setSpeed       // manual-mode CML speed ceiling (value = m/s)
+    // Console A22 (VAL backend manual driving).
+    case pupitreKG        // master power (value: 1 = on, 0 = off)
+    case pupitreReverser  // value: +1 AV, 0 neutral, -1 AR
+    case pupitreLever     // value: -1 (full brake) ... +1 (full traction)
+    case kacopAck         // dead-man acknowledgment (momentary press)
 }
 
 /// A control request for a specific remote rame. `value` is only

@@ -184,8 +184,12 @@ extension DCLEngine {
     }
 
     /// SET RAME <label> /MANUAL | /AUTOMATIC
-    ///                  /SPEED=<m/s>          (manual-mode setpoint)
+    ///                  /SPEED=<m/s>          (manual CML speed ceiling)
     ///                  /FU=ON|OFF            (emergency brake)
+    ///                  /KG=ON|OFF            (pupitre master power)
+    ///                  /REVERSER=AV|0|AR     (FR: /INVERSEUR)
+    ///                  /LEVER=<-100..100>    (FR: /MANIPULATEUR, percent)
+    ///                  /KACOP                (dead-man acknowledgment)
     ///                  /PORTES=ON|OFF        (door fault; /DOOR synonym)
     ///                  /TRACTION=ON|OFF      (engine fault; /ENGINE synonym)
     ///                  /FREIN=ON|OFF         (brake fault; /BRAKE synonym)
@@ -195,7 +199,9 @@ extension DCLEngine {
     ///                  /PNEU=<n>             (cycle tire <n>; /TIRE synonym)
     ///
     /// Qualifiers accept both the French exploitation terms and their
-    /// English equivalents so EN and FR operators can drive the same rame.
+    /// English equivalents so EN and FR operators can drive the same
+    /// rame. KG, KACOP and the reverser positions AV/0/AR are real cab
+    /// labels -- language-neutral identifiers in both modes.
     func setRame(_ cmd: Parsed) -> String {
         guard let label = cmd.positional.dropFirst().first else {
             return tr("valcp.rame.missrame")
@@ -250,6 +256,43 @@ extension DCLEngine {
             return routed(on ? .fuSet : .fuRelease, localText: on
                 ? String(format: tr("valcp.rame.fu.on"), dLabel)
                 : String(format: tr("valcp.rame.fu.off"), dLabel))
+        }
+        // Console A22 (pupitre) -- exploitation controls, routed like the
+        // panel's. KG/KACOP/AV/AR are cab labels, identical in both modes.
+        if let kg = cmd.qualifierValue("KG", min: 2) {
+            let on = kg.uppercased() == "ON"
+            return routed(.pupitreKG, value: on ? 1 : 0, localText:
+                String(format: tr("valcp.rame.kg"), dLabel,
+                       on ? tr("valcp.rame.pupitre.on") : tr("valcp.rame.pupitre.off")))
+        }
+        if let rev = cmd.qualifierValue(locQual(en: "REVERSER", fr: "INVERSEUR"), min: 3) {
+            let v: Double
+            switch rev.uppercased() {
+            case "AV", "+1", "1": v = 1
+            case "AR", "-1":      v = -1
+            case "0", "N", "NEUTRAL", "NEUTRE": v = 0
+            default:
+                return tr("valcp.rame.reverser.bad")
+            }
+            guard train.mode == .manual else {
+                return String(format: tr("valcp.rame.pupitre.notmanual"), dLabel)
+            }
+            let name = v > 0 ? "AV" : (v < 0 ? "AR" : "0")
+            return routed(.pupitreReverser, value: v, localText:
+                String(format: tr("valcp.rame.reverser.set"), dLabel, name))
+        }
+        if let lev = cmd.qualifierValue(locQual(en: "LEVER", fr: "MANIPULATEUR"), min: 3),
+           let pct = Double(lev) {
+            guard train.mode == .manual else {
+                return String(format: tr("valcp.rame.pupitre.notmanual"), dLabel)
+            }
+            let clamped = max(-100, min(100, pct))
+            return routed(.pupitreLever, value: clamped / 100.0, localText:
+                String(format: tr("valcp.rame.lever.set"), dLabel, clamped))
+        }
+        if cmd.hasQualifier("KACOP", min: 5) {
+            return routed(.kacopAck, localText:
+                String(format: tr("valcp.rame.kacop.ack"), dLabel))
         }
         // Latched fault points and tires model the owning node's physical
         // rolling stock -- owner-only by design (no wire command exists).

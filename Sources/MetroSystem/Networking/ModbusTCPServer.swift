@@ -23,7 +23,10 @@ import Network
 ///     0..15    Rame[0..15]  Door OPEN command
 ///     16..31   Rame[0..15]  Door CLOSE command
 ///     32..47   Rame[0..15]  FU SET   (command the emergency brake)
-///     48..63   Rame[0..15]  FU RELEASE
+///     48..63   Rame[0..15]  FU RELEASE (honoured at a stand)
+///     64..79   Rame[0..15]  KACOP acknowledge (dead-man, VAL manual)
+///     80..95   Rame[0..15]  Pupitre KG ON  (console A22 master power)
+///     96..111  Rame[0..15]  Pupitre KG OFF
 ///
 ///   Discrete inputs (single-bit, RO) -- FC 02:
 ///     0..15    Rame[0..15]  is locally owned
@@ -44,10 +47,15 @@ import Network
 ///     208..223 Rame[0..15]  service brake OK
 ///     224..239 Rame[0..15]  adhesion OK (no burst tire)
 ///     240..255 Rame[0..15]  safety chain intact (series loop, incl. line mode)
+///     256..271 Rame[0..15]  KACOP vigilance warning (VAL manual driving)
+///     272..287 Rame[0..15]  perturbed stopping program (PP) selected
 ///
 ///   Holding registers (16-bit, R/W) -- FC 03 read, FC 06 write:
 ///     0..15    Rame[0..15]  Mode  (read/write: 0 = Manual, 1 = Auto)
-///     16..31   Rame[0..15]  Manual speed setpoint x10  (m/s x10, 0..200)
+///     16..31   Rame[0..15]  Manual CML speed ceiling x10  (m/s x10, 0..200)
+///     32..47   Rame[0..15]  Pupitre T/F lever, signed Int16 percent
+///                           (-100 full brake .. +100 full traction)
+///     48..63   Rame[0..15]  Pupitre reverser (0=neutral, 1=AV, 2=AR)
 ///
 ///   Input registers (16-bit, RO) -- FC 04:
 ///     0..15    Rame[0..15]  Position x10 (metres; 123.4 m = 1234)
@@ -58,6 +66,10 @@ import Network
 ///     80..95   Rame[0..15]  Status (0=stopped, 1=moving, 2=FU, 3=docked)
 ///     96..111  Rame[0..15]  Canton number (1..10)
 ///     112..127 Rame[0..15]  Worst tire (0=OK, 1=low, 2=puncture, 3=burst)
+///     128..143 Rame[0..15]  VAL speed program (0=SF-N, 1=PP, 2=SFA,
+///                           3=SFB, 4=HOLD, 5=ASMD, 6=ABSENT;
+///                           0xFFFF = not VAL-driven)
+///     144..159 Rame[0..15]  KACOP seconds since acknowledge x10
 ///     1000    Number of rames known (local + remote)
 ///     1001    Number of remote peers connected
 ///     1002    Canton count
@@ -116,13 +128,14 @@ final class ModbusTCPServer: ObservableObject {
     static let defaultPort: UInt16 = 5020
     static let maxTrains: Int = 16
     /// Number of per-rame input-register fields (position, speed, consigne,
-    /// MA, pax, status, canton, worst tire). The rame-indexed IR block
-    /// therefore spans `0 ..< irTrainFieldCount * maxTrains`; the line-wide
-    /// scalar registers live above it at `scalarBase`.
-    static let irTrainFieldCount: Int = 8
+    /// MA, pax, status, canton, worst tire, VAL speed program, KACOP
+    /// timer). The rame-indexed IR block therefore spans
+    /// `0 ..< irTrainFieldCount * maxTrains`; the line-wide scalar
+    /// registers live above it at `scalarBase`.
+    static let irTrainFieldCount: Int = 10
     /// First address of the line-wide scalar input registers. Placed at a
     /// round 1000, well clear of the rame-indexed block
-    /// (`irTrainFieldCount * maxTrains = 128`).
+    /// (`irTrainFieldCount * maxTrains = 160`).
     static let scalarBase: Int = 1000
     /// How long the MODBUS status indicator holds "connected" after the last
     /// live socket closes.
@@ -497,6 +510,8 @@ final class ModbusClient {
         case 1: return !t.doorsOpen                         // door CLOSE state
         case 2: return t.isEmergencyBrakeApplied            // FU SET latched
         case 3: return !t.isEmergencyBrakeApplied           // FU released
+        case 4: return t.kacopWarning                       // KACOP ack pending
+        case 5: return t.pupitreKG                          // KG state
         default:
             return false
         }
@@ -515,6 +530,9 @@ final class ModbusClient {
         case 1: _ = network?.control(t, .closeDoors)
         case 2: _ = network?.control(t, .fuSet)
         case 3: _ = network?.control(t, .fuRelease)
+        case 4: _ = network?.control(t, .kacopAck)          // KACOP ack pulse
+        case 5: _ = network?.control(t, .pupitreKG, value: 1)   // KG on
+        case 6: _ = network?.control(t, .pupitreKG, value: 0)   // KG off
         default:
             break
         }
@@ -547,6 +565,8 @@ final class ModbusClient {
             case 14: return chain.adhesionOK
             default: return chain.intact          // group 15
             }
+        case 16: return t.kacopWarning                      // vigilance overdue
+        case 17: return t.speedProgram == VALSpeedProgram.perturbed.rawValue
         default: return false
         }
     }
@@ -558,6 +578,11 @@ final class ModbusClient {
         switch group {
         case 0: return t.mode == .auto ? 1 : 0
         case 1: return UInt16(max(0, min(200, Int(t.manualSpeedRequest * 10.0))))
+        case 2:                                     // pupitre lever % signed
+            let pct = Int(t.pupitreLever * 100.0)
+            return UInt16(bitPattern: Int16(max(-100, min(100, pct))))
+        case 3:                                     // reverser 0=neutral 1=AV 2=AR
+            return t.pupitreReverser > 0 ? 1 : (t.pupitreReverser < 0 ? 2 : 0)
         default: return 0
         }
     }
@@ -572,6 +597,12 @@ final class ModbusClient {
         case 1:                                     // manual speed x10
             let speed = Double(min(value, 200)) / 10.0
             _ = network?.control(t, .setSpeed, value: speed)
+        case 2:                                     // pupitre lever % signed
+            let pct = Double(Int16(bitPattern: value))
+            _ = network?.control(t, .pupitreLever, value: max(-100, min(100, pct)) / 100.0)
+        case 3:                                     // reverser 0=neutral 1=AV 2=AR
+            let rev: Double = value == 1 ? 1 : (value == 2 ? -1 : 0)
+            _ = network?.control(t, .pupitreReverser, value: rev)
         default:
             break
         }
@@ -611,6 +642,19 @@ final class ModbusClient {
                 case .puncture:    return 2
                 case .burst:       return 3
                 }
+            case 8:                                 // VAL speed program
+                switch VALSpeedProgram(rawValue: t.speedProgram) {
+                case .normal:           return 0
+                case .perturbed:        return 1
+                case .stationArrival:   return 2
+                case .stationDeparture: return 3
+                case .departureHeld:    return 4
+                case .pushRecovery:     return 5
+                case .absent:           return 6
+                case nil:               return 0xFFFF   // not VAL-driven
+                }
+            case 9:                                 // KACOP timer x10 (s)
+                return UInt16(max(0, min(0xFFFF, Int(t.kacopSecondsSinceAck * 10.0))))
             default:
                 return 0
             }

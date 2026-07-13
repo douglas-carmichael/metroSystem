@@ -12,13 +12,47 @@ enum Sim {
     static let cantonLength: Double = 100.0
     static var trackLength: Double { Double(cantonCount) * cantonLength }
 
+    // VAL 206 motion profile (DOT assessment values, as in the app).
     static let lineSpeed: Double = 15.0
-    static let maxAcceleration: Double = 1.0
-    static let nominalBraking: Double = 0.8
-    static let emergencyBraking: Double = 1.2
+    static let maxAcceleration: Double = 1.3
+    static let nominalBraking: Double = 1.3
+    static let emergencyBraking: Double = 2.15
+    static let jerkMax: Double = 0.65
 
     static let safetyMargin: Double = 50.0
     static let maDistanceMargin: Double = 1.0
+
+    // Fixed-block AVP parameters (mirror of the app's VAL backend).
+    static let perturbedStopMargin: Double = 8.0
+    static let avpOverspeedRatio: Double = 0.30 / 0.27
+    static let manualPenetrationTrip: Double = 10.0
+    static let rollbackTrip: Double = 5.0
+    static let stationBlockSpeed: Double = 8.0
+    static let asmdSpeed: Double = 0.8
+    static let beaconB1Distance: Double = 100.0
+    static let beaconB2Distance: Double = 16.0
+    static let beaconB3Distance: Double = 8.0
+    static let stopPrecision: Double = 0.30
+
+    // Traction chain envelope (image série; see the app's VALTraction).
+    static let tareMass: Double = 31_000
+    static let passengerMass: Double = 70
+    static let motorCount: Int = 4
+    static let gearRatio: Double = 8.6
+    static let wheelRadius: Double = 0.445
+    static let imageSerieFullField: Double = 0.059
+    static let imageSerieWeakField: Double = 0.034
+    static let motorTorquePerAmp2: Double = 0.0326
+    static let armatureResistance: Double = 0.16
+    static let armatureCurrentMax: Double = 620
+    static let lineVoltage: Double = 750
+    static let davisA: Double = 0.011 * 9.81
+    static let davisB: Double = 30.0
+    static let davisC: Double = 2.6
+
+    // Console A22 vigilance.
+    static let kacopWarningDelay: Double = 14.0
+    static let kacopTripDelay: Double = 20.0
 
     static let stationApproachWindow: Double = 150.0
     static let stationStopTolerance: Double = 1.5
@@ -76,6 +110,36 @@ enum TrainStatus: String, Codable {
     case docked
 }
 
+/// Mirror of the app's `VALSpeedProgram` (raw values ride the wire in
+/// `Train.speedProgram`).
+enum VALSpeedProgram: String, Codable {
+    case normal
+    case perturbed
+    case stationArrival
+    case stationDeparture
+    case departureHeld
+    case pushRecovery
+    case absent
+}
+
+/// Mirror of the app's `VALTripCause` (raw values ride the wire in
+/// `Train.ebCause`).
+enum VALTripCause: String, Codable {
+    case none
+    case overspeed
+    case sfLoss
+    case blockPenetration
+    case rollback
+    case ppOverrun
+    case doorUnlocked
+    case vigilance
+    case doorFault
+    case brakeFault
+    case lineEmergency
+    case controllerAlarm
+    case operatorFU
+}
+
 /// Mirror of the app's `Train`. Property names and CodingKeys must match
 /// field-for-field -- this struct IS the `.state` payload the app decodes.
 struct Train: Identifiable, Codable {
@@ -117,6 +181,15 @@ struct Train: Identifiable, Codable {
     var speedError: Double = 0
     var distanceToMA: Double = 0
 
+    // VAL fixed-block telemetry + console A22 (mirror of the app's).
+    var speedProgram: String = ""
+    var ebCause: String = "none"
+    var pupitreKG: Bool = false
+    var pupitreReverser: Int = 0
+    var pupitreLever: Double = 0
+    var kacopSecondsSinceAck: Double = 0
+    var kacopWarning: Bool = false
+
     struct Tire: Identifiable, Codable {
         let id: Int
         var pressure: Double = Sim.tireNominalBar
@@ -149,6 +222,9 @@ struct Train: Identifiable, Codable {
         case isDoorFault, isEngineFault, isBrakeFault, isSignalFault
         case isPatinage, isEnrayage, isEmergencyBrakeApplied
         case consigneVitesse, speedError, distanceToMA, tires
+        case speedProgram, ebCause
+        case pupitreKG, pupitreReverser, pupitreLever
+        case kacopSecondsSinceAck, kacopWarning
         case mainVoltage, batteryVoltage, tractionCurrent, tractionTorque
         case compressorPressure, isCompressorRunning, interiorTemperature
     }
@@ -158,5 +234,61 @@ struct Train: Identifiable, Codable {
         self.label = label
         self.ownerPeerId = ownerPeerId
         self.position = position
+    }
+
+    /// Tolerant decoding, like the app's: fields added after first
+    /// release fall back to their defaults so an older peer build stays
+    /// wire-compatible in both directions.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        label = try c.decode(String.self, forKey: .label)
+        ownerPeerId = try c.decodeIfPresent(String.self, forKey: .ownerPeerId) ?? ""
+        position = try c.decode(Double.self, forKey: .position)
+        speed = try c.decodeIfPresent(Double.self, forKey: .speed) ?? 0
+        acceleration = try c.decodeIfPresent(Double.self, forKey: .acceleration) ?? 0
+        targetSpeed = try c.decodeIfPresent(Double.self, forKey: .targetSpeed) ?? Sim.lineSpeed
+        movementAuthority = try c.decodeIfPresent(Double.self, forKey: .movementAuthority) ?? 0
+        travelDirection = try c.decodeIfPresent(TravelDirection.self, forKey: .travelDirection) ?? .forward
+        status = try c.decodeIfPresent(TrainStatus.self, forKey: .status) ?? .stopped
+        mode = try c.decodeIfPresent(TrainMode.self, forKey: .mode) ?? .auto
+        manualSpeedRequest = try c.decodeIfPresent(Double.self, forKey: .manualSpeedRequest) ?? 0
+        doorsOpen = try c.decodeIfPresent(Bool.self, forKey: .doorsOpen) ?? false
+        isDwelling = try c.decodeIfPresent(Bool.self, forKey: .isDwelling) ?? false
+        dwellRemaining = try c.decodeIfPresent(TimeInterval.self, forKey: .dwellRemaining) ?? 0
+        isDepartureHold = try c.decodeIfPresent(Bool.self, forKey: .isDepartureHold) ?? false
+        lastServicedStationId = try c.decodeIfPresent(Int.self, forKey: .lastServicedStationId)
+        nextStationName = try c.decodeIfPresent(String.self, forKey: .nextStationName) ?? "..."
+        passengerCount = try c.decodeIfPresent(Int.self, forKey: .passengerCount) ?? 0
+        lastPaxChange = try c.decodeIfPresent(Int.self, forKey: .lastPaxChange) ?? 0
+        paxRemaining = try c.decodeIfPresent(Int.self, forKey: .paxRemaining) ?? 0
+        paxExchangeInterval = try c.decodeIfPresent(TimeInterval.self, forKey: .paxExchangeInterval) ?? 0
+        paxExchangeTimer = try c.decodeIfPresent(TimeInterval.self, forKey: .paxExchangeTimer) ?? 0
+        isDoorFault = try c.decodeIfPresent(Bool.self, forKey: .isDoorFault) ?? false
+        isEngineFault = try c.decodeIfPresent(Bool.self, forKey: .isEngineFault) ?? false
+        isBrakeFault = try c.decodeIfPresent(Bool.self, forKey: .isBrakeFault) ?? false
+        isSignalFault = try c.decodeIfPresent(Bool.self, forKey: .isSignalFault) ?? false
+        isPatinage = try c.decodeIfPresent(Bool.self, forKey: .isPatinage) ?? false
+        isEnrayage = try c.decodeIfPresent(Bool.self, forKey: .isEnrayage) ?? false
+        isEmergencyBrakeApplied = try c.decodeIfPresent(Bool.self, forKey: .isEmergencyBrakeApplied) ?? false
+        consigneVitesse = try c.decodeIfPresent(Double.self, forKey: .consigneVitesse) ?? 0
+        speedError = try c.decodeIfPresent(Double.self, forKey: .speedError) ?? 0
+        distanceToMA = try c.decodeIfPresent(Double.self, forKey: .distanceToMA) ?? 0
+        speedProgram = try c.decodeIfPresent(String.self, forKey: .speedProgram) ?? ""
+        ebCause = try c.decodeIfPresent(String.self, forKey: .ebCause) ?? "none"
+        pupitreKG = try c.decodeIfPresent(Bool.self, forKey: .pupitreKG) ?? false
+        pupitreReverser = try c.decodeIfPresent(Int.self, forKey: .pupitreReverser) ?? 0
+        pupitreLever = try c.decodeIfPresent(Double.self, forKey: .pupitreLever) ?? 0
+        kacopSecondsSinceAck = try c.decodeIfPresent(Double.self, forKey: .kacopSecondsSinceAck) ?? 0
+        kacopWarning = try c.decodeIfPresent(Bool.self, forKey: .kacopWarning) ?? false
+        tires = try c.decodeIfPresent([Tire].self, forKey: .tires)
+            ?? (1...Sim.tireCount).map { Tire(id: $0) }
+        mainVoltage = try c.decodeIfPresent(Double.self, forKey: .mainVoltage) ?? 750.0
+        batteryVoltage = try c.decodeIfPresent(Double.self, forKey: .batteryVoltage) ?? 76.5
+        tractionCurrent = try c.decodeIfPresent(Double.self, forKey: .tractionCurrent) ?? 0
+        tractionTorque = try c.decodeIfPresent(Double.self, forKey: .tractionTorque) ?? 0
+        compressorPressure = try c.decodeIfPresent(Double.self, forKey: .compressorPressure) ?? 8.5
+        isCompressorRunning = try c.decodeIfPresent(Bool.self, forKey: .isCompressorRunning) ?? false
+        interiorTemperature = try c.decodeIfPresent(Double.self, forKey: .interiorTemperature) ?? 22.0
     }
 }

@@ -5,10 +5,14 @@ import Combine
 //
 // The front end (PCC panels, 3D synoptic, DCL, Modbus, peer wire) is a
 // view over MetroWorld. Which engine PUTS state into that world is the
-// backend, and there are three:
+// backend, and there are four:
 //
-//   VAL         the original self-contained VAL simulation -- MetroWorld
-//               ticks its own physics (unchanged behaviour, the default).
+//   VAL         the fixed-block VAL simulation rebuilt on the real
+//               system's architecture (wayside speed programs, OBCU
+//               AVP/AVO racks, image-série traction chain, console A22
+//               manual driving) -- the default.
+//   CBTC_SIM    the moving-block CBTC scan that originally drove this
+//               app: continuous movement authority behind the leader.
 //   PRATIC_SIM  a simulation of the PRATIC moving-block CBTC network:
 //               heartbeats, balise fixes, position confidence,
 //               delocalization and recovery -- for developing and
@@ -32,12 +36,14 @@ import Combine
 
 enum BackendKind: String, CaseIterable {
     case val = "VAL"
+    case cbtcSim = "CBTC_SIM"
     case praticSim = "PRATIC_SIM"
     case praticHardware = "PRATIC_HW"
 
     var summaryKey: String {
         switch self {
         case .val:            return "backend.val.summary"
+        case .cbtcSim:        return "backend.cbtc.summary"
         case .praticSim:      return "backend.sim.summary"
         case .praticHardware: return "backend.hw.summary"
         }
@@ -130,6 +136,9 @@ final class BackendManager: ObservableObject {
         case .val:
             world.seedTrains()
             fresh = VALSimBackend(world: world)
+        case .cbtcSim:
+            world.seedTrains()
+            fresh = CBTCSimBackend(world: world)
         case .praticSim:
             fresh = PraticSimBackend(world: world)
         case .praticHardware:

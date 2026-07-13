@@ -62,13 +62,23 @@ cd ClusterDaemon && swift run metro-clusterd --nodes 2 --trains 2
 See [ClusterDaemon/README.md](ClusterDaemon/README.md) for the daemon and
 the app↔daemon wire-mirror pairs.
 
-## Backends — VAL and PRATIC
+## Backends — VAL, CBTC and PRATIC
 
 The app is also the PCC front end for **PRATIC** (Projet de Réseau
 Automatique de Trains Inter-Connectés), a model-scale CBTC autopilot.
 `SET BACKEND` in the terminal switches the engine behind the whole UI:
 
-- **VAL** — the self-contained simulation above (default).
+- **VAL** — the fixed-block simulation built on the real system's
+  architecture (default): wayside SF/PP speed programs physically
+  "encoded" in the guideway, block occupancy protection, on-board
+  AVP/AVO racks, B1/B2/B3 beacon station stops, the image-série
+  traction chain, and full console-A22 manual driving (KG, reverser,
+  traction/brake lever, KACOP dead-man). Sourced from the UMTA/DOT VAL
+  assessment and the VAL 206 thesis in the repo root; details in
+  [docs/val-backend.md](docs/val-backend.md).
+- **CBTC_SIM** — the moving-block scan that originally drove the app,
+  kept as its own engine: continuous movement authority behind the
+  leader, the counterpoint to VAL's 1983 fixed blocks.
 - **PRATIC_SIM** — a simulated moving-block CBTC network: continuous
   position/heartbeat reporting, balise fixes, link status
   (OK/DEGRADED/LOST), position confidence
@@ -139,8 +149,11 @@ discovery.
 ```
 $ FLEET                              ! fleet table (or FLOTTE)
 $ RAME 101                           ! per-train status sheet (or TRAIN 101)
-$ VALCP SET RAME 101 /MANUAL         ! manual driving
-$ VALCP SET RAME 101 /SPEED=8
+$ VALCP SET RAME 101 /MANUAL         ! manual driving (console A22)
+$ VALCP SET RAME 101 /KG=ON          ! master power
+$ VALCP SET RAME 101 /REVERSER=AV    ! point the reverser
+$ VALCP SET RAME 101 /LEVER=50       ! 50% traction (KACOP every 14 s!)
+$ VALCP SET RAME 101 /SPEED=8        ! CML governor ceiling
 $ STOP RAME 101                      ! emergency brake
 $ START RAME 101                     ! release
 $ VALCP SET LIGNE /SP=(1,3,60)       ! shuttle CHU <-> Gare, 60 s headway

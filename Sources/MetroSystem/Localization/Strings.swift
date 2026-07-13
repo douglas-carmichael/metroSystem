@@ -27,7 +27,7 @@ enum Strings {
         "alarm.msg.doorfault", "alarm.msg.enginefault", "alarm.msg.brakefault",
         "alarm.msg.signalfault", "alarm.msg.patinage", "alarm.msg.enrayage",
         "alarm.msg.tirelow", "alarm.msg.tirepuncture", "alarm.msg.tireburst",
-        "alarm.msg.paxfull", "alarm.msg.doorheld",
+        "alarm.msg.paxfull", "alarm.msg.doorheld", "alarm.msg.kacop",
         "alarm.msg.controller", "alarm.msg.power", "alarm.msg.track",
         "alarm.msg.platform", "alarm.msg.display", "alarm.msg.switch",
         "alarm.msg.hwlink",
@@ -326,6 +326,8 @@ enum Strings {
                                     "Charge voyageurs à 80 % de la capacité ou plus")
         add("alarm.msg.doorheld",   "Doors held open beyond dwell",
                                     "Portes maintenues ouvertes au-delà du stationnement")
+        add("alarm.msg.kacop",      "KACOP vigilance overdue -- acknowledge or the FU trips",
+                                    "Vigilance KACOP dépassée -- acquitter sinon FU")
         add("alarm.msg.controller", "PCC controller watchdog fault -- all trains held",
                                     "Défaut chien de garde PCC -- toutes rames retenues")
         add("alarm.msg.hwlink",     "Model-track hardware link down while output armed",
@@ -369,6 +371,23 @@ enum Strings {
         add("train.status.emergency","EB",                                 "FU")
         add("train.status.docked",  "AT PLATFORM",                         "À QUAI")
         add("train.faults",         "FAULTS",                              "DÉFAUTS")
+        // VAL fixed-block telemetry labels (values are firmware mnemonics).
+        add("train.program",        "PROG",                                "PROG")
+        add("train.ebcause",        "FU CAUSE",                            "CAUSE FU")
+
+        // Console A22 -- pupitre de conduite manuelle. KG / KACOP / AV /
+        // 0 / AR are real cab markings, language-neutral by convention.
+        add("pupitre.title",        "PUPITRE A22",                         "PUPITRE A22")
+        add("pupitre.reverser",     "REVERSER",                            "INVERSEUR")
+        add("pupitre.lever",        "T/B LEVER (F = brake, T = traction)", "MANIPULATEUR T/F (F = frein, T = traction)")
+        add("pupitre.kacop.warning","VIGILANCE!",                          "VIGILANCE !")
+        add("pupitre.vigilance",    "Vigilance timer",                     "Temporisation vigilance")
+        add("pupitre.traction.inhibited","Traction inhibited (KG / reverser / doors / FU)",
+                                    "Traction inhibée (KG / inverseur / portes / FU)")
+        add("pupitre.covered",      "Cab cover locked -- automatic driving","Capot verrouillé -- pilotage automatique")
+        add("detail.sec.pupitre",   "MANUAL DRIVING -- CONSOLE A22",       "CONDUITE MANUELLE -- PUPITRE A22")
+        add("detail.atp.program",   "Speed program",                       "Programme de vitesse")
+        add("detail.atp.ebcause",   "FU cause",                            "Cause FU")
         add("train.faults.label",   "FAULT INJECTION",                     "INJECTION DE DÉFAUTS")
         add("train.manual.speed",   "MANUAL SPEED",                        "VITESSE MANUELLE")
         add("train.tires.label",    "TIRES",                               "PNEUS")
@@ -443,6 +462,9 @@ enum Strings {
         add("dynamics.state.manual","MANUAL",                              "CML")
         add("dynamics.state.eb",    "EB",                                  "FU")
         add("dynamics.state.hold",  "HOLD",                                "RETENUE")
+        // Perturbed stopping program (PP) actively slowing the rame --
+        // the mnemonic is a firmware identifier, shared by both modes.
+        add("dynamics.state.perturbed","PERT",                             "PERT")
         add("dynamics.trace.title", "SPEED TRACE",                         "TRACÉ DE VITESSE")
         add("dynamics.trace.axis",  "60 s window · line speed dashed",     "fenêtre 60 s · vitesse ligne en tirets")
         add("dynamics.trace.empty", "(collecting samples...)",             "(acquisition en cours...)")
@@ -566,17 +588,19 @@ enum Strings {
         // Backend selection (SHOW/SET BACKEND) and the PRATIC network
         // surface (SHOW/SET PRATIC).
         add("backend.title",        "STATE BACKENDS (* = active)",         "MOTEURS D'ÉTAT (* = actif)")
-        add("backend.val.summary",  "Self-contained VAL simulation (the classic line)",
-                                    "Simulation VAL autonome (la ligne classique)")
+        add("backend.val.summary",  "Fixed-block VAL (wayside SF/PP programs, OBCU, console A22)",
+                                    "VAL à cantons fixes (programmes SF/PP au sol, OBCU, pupitre A22)")
+        add("backend.cbtc.summary", "Moving-block CBTC simulation (continuous movement authority)",
+                                    "Simulation CBTC à canton mobile (autorisation de mouvement continue)")
         add("backend.sim.summary",  "PRATIC moving-block CBTC, simulated (no hardware)",
                                     "CBTC à canton mobile PRATIC, simulé (sans matériel)")
         add("backend.hw.summary",   "PRATIC real network via telemetry transport (GoA4 supervision)",
                                     "Réseau PRATIC réel via transport de télémesure (supervision GoA4)")
         add("backend.transport",    "Telemetry transport: %@",             "Transport de télémesure : %@")
-        add("backend.hint",         "SET BACKEND VAL | PRATIC_SIM | PRATIC_HW switches (replaces the local fleet)",
-                                    "SET BACKEND VAL | PRATIC_SIM | PRATIC_HW bascule (remplace la flotte locale)")
-        add("backend.set.usage",    "Usage: SET BACKEND VAL | PRATIC_SIM | PRATIC_HW",
-                                    "Usage : SET BACKEND VAL | PRATIC_SIM | PRATIC_HW")
+        add("backend.hint",         "SET BACKEND VAL | CBTC_SIM | PRATIC_SIM | PRATIC_HW switches (replaces the local fleet)",
+                                    "SET BACKEND VAL | CBTC_SIM | PRATIC_SIM | PRATIC_HW bascule (remplace la flotte locale)")
+        add("backend.set.usage",    "Usage: SET BACKEND VAL | CBTC_SIM | PRATIC_SIM | PRATIC_HW",
+                                    "Usage : SET BACKEND VAL | CBTC_SIM | PRATIC_SIM | PRATIC_HW")
         add("backend.set.bad",      "No such backend: %@ -- SHOW BACKEND lists them.",
                                     "Moteur d'état inconnu : %@ -- SHOW BACKEND les liste.")
         add("backend.set.ok",       "Backend switched to %@ -- local fleet replaced.",
@@ -858,6 +882,26 @@ enum Strings {
                                     "%%SET-S-FAULT, enrayage rame %@ %@\n")
         add("valcp.rame.fault.set", "latched",                             "activé")
         add("valcp.rame.fault.cleared","cleared",                          "levé")
+        // Console A22 qualifiers (SET RAME /KG /REVERSER /LEVER /KACOP).
+        add("valcp.rame.kg",        "%%SET-S-PUPITRE, train %@ KG %@\n",
+                                    "%%SET-S-PUPITRE, KG rame %@ %@\n")
+        add("valcp.rame.pupitre.on","switched on",                         "enclenché")
+        add("valcp.rame.pupitre.off","switched off",                       "coupé")
+        add("valcp.rame.pupitre.notmanual","%%SET-W-NOTMANUAL, train %@ is in automatic operation -- the cab cover is locked\n",
+                                    "%%SET-W-NOTMANUAL, la rame %@ est en pilotage automatique -- capot pupitre verrouillé\n")
+        add("valcp.rame.reverser.set","%%SET-S-PUPITRE, train %@ reverser to %@\n",
+                                    "%%SET-S-PUPITRE, inverseur rame %@ sur %@\n")
+        add("valcp.rame.reverser.bad","%%SET-W-IVKEYW, reverser takes AV, 0 or AR\n",
+                                    "%%SET-W-IVKEYW, l'inverseur accepte AV, 0 ou AR\n")
+        add("valcp.rame.lever.set", "%%SET-S-PUPITRE, train %@ lever %+.0f%%\n",
+                                    "%%SET-S-PUPITRE, manipulateur rame %@ %+.0f %%\n")
+        add("valcp.rame.kacop.ack", "%%SET-S-KACOP, vigilance acknowledged on train %@\n",
+                                    "%%SET-S-KACOP, vigilance acquittée sur la rame %@\n")
+        // VALCP SHOW RAME rows (VAL fixed-block telemetry).
+        add("valcp.rame.program",   "  Speed program:  ",                  "  Programme :     ")
+        add("valcp.rame.ebcause",   "FU cause:",                           "cause FU :")
+        add("valcp.rame.pupitre",   "  Pupitre A22:    KG %@   reverser %@   lever %+.0f%%   KACOP %.1f s",
+                                    "  Pupitre A22 :   KG %@   inverseur %@   manip. %+.0f %%   KACOP %.1f s")
         add("valcp.rame.pneu.range","%%SET-W-IVPNEU, tire index must be 1..%d\n",
                                     "%%SET-W-IVPNEU, l'index du pneu doit être 1..%d\n")
         add("valcp.rame.pneu.cycled","%%SET-S-PNEU, train %@ tire %d now %@\n",

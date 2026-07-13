@@ -101,6 +101,25 @@ struct Train: Identifiable, Hashable, Codable {
     var speedError: Double = 0
     var distanceToMA: Double = 0
 
+    // VAL backend telemetry (empty / defaults under other backends --
+    // the views gate their VAL-specific rows on `speedProgram`).
+    /// Raw value of `VALSpeedProgram`: which track-encoded speed program
+    /// the OBCU is receiving ("" when the rame isn't driven by the VAL
+    /// fixed-block backend).
+    var speedProgram: String = ""
+    /// Raw value of `VALTripCause`: why the FU latched ("none" when
+    /// released).
+    var ebCause: String = "none"
+
+    // Console A22 -- pupitre de conduite manuelle (VAL backend, manual
+    // mode). Wire-carried so a remote rame's cab state renders everywhere;
+    // driven through the pupitre TrainCommands.
+    var pupitreKG: Bool = false        // coupure générale (master power)
+    var pupitreReverser: Int = 0       // +1 AV / 0 neutral / -1 AR
+    var pupitreLever: Double = 0       // +1 traction ... -1 service brake
+    var kacopSecondsSinceAck: Double = 0
+    var kacopWarning: Bool = false
+
     // Tires (VAL pneumatic running gear).
     struct Tire: Identifiable, Hashable, Codable {
         let id: Int
@@ -156,6 +175,9 @@ struct Train: Identifiable, Hashable, Codable {
         case isDoorFault, isEngineFault, isBrakeFault, isSignalFault
         case isPatinage, isEnrayage, isEmergencyBrakeApplied
         case consigneVitesse, speedError, distanceToMA, tires
+        case speedProgram, ebCause
+        case pupitreKG, pupitreReverser, pupitreLever
+        case kacopSecondsSinceAck, kacopWarning
         case mainVoltage, batteryVoltage, cvsOutputVoltage
         case tractionCurrent, tractionTorque, lightingCurrent
         case compressorPressure, isCompressorRunning
@@ -209,6 +231,13 @@ struct Train: Identifiable, Hashable, Codable {
         consigneVitesse = try c.decodeIfPresent(Double.self, forKey: .consigneVitesse) ?? 0
         speedError = try c.decodeIfPresent(Double.self, forKey: .speedError) ?? 0
         distanceToMA = try c.decodeIfPresent(Double.self, forKey: .distanceToMA) ?? 0
+        speedProgram = try c.decodeIfPresent(String.self, forKey: .speedProgram) ?? ""
+        ebCause = try c.decodeIfPresent(String.self, forKey: .ebCause) ?? "none"
+        pupitreKG = try c.decodeIfPresent(Bool.self, forKey: .pupitreKG) ?? false
+        pupitreReverser = try c.decodeIfPresent(Int.self, forKey: .pupitreReverser) ?? 0
+        pupitreLever = try c.decodeIfPresent(Double.self, forKey: .pupitreLever) ?? 0
+        kacopSecondsSinceAck = try c.decodeIfPresent(Double.self, forKey: .kacopSecondsSinceAck) ?? 0
+        kacopWarning = try c.decodeIfPresent(Bool.self, forKey: .kacopWarning) ?? false
         tires = try c.decodeIfPresent([Tire].self, forKey: .tires)
             ?? (1...Sim.tireCount).map { Tire(id: $0) }
         mainVoltage = try c.decodeIfPresent(Double.self, forKey: .mainVoltage) ?? 750.0
@@ -273,9 +302,12 @@ struct Train: Identifiable, Hashable, Codable {
     // (ClusterDaemon) rames exactly as for local ones.
 
     /// Overspeed relative to the asservissement's commanded speed with a
-    /// vital margin (mirrors an ATP ceiling-speed trip).
+    /// vital margin (mirrors an ATP ceiling-speed trip). Quiet while the
+    /// emergency brake already has the rame -- the FU alarm and `ebCause`
+    /// carry that state; sampling overspeed against a collapsed consigne
+    /// would double-alarm every trip.
     var isOverspeed: Bool {
-        speed > max(consigneVitesse, 0) + 2.0 && speed > 1.0
+        speed > max(consigneVitesse, 0) + 2.0 && speed > 1.0 && !isEmergencyBrakeApplied
     }
 
     /// Door interlock proven: doors closed and locked (motion permitted).

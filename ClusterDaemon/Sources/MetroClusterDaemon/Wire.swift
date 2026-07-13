@@ -41,6 +41,11 @@ enum TrainCommandKind: String, Codable {
     case modeAuto
     case modeManual
     case setSpeed
+    // Console A22 (VAL manual driving).
+    case pupitreKG
+    case pupitreReverser
+    case pupitreLever
+    case kacopAck
 }
 
 /// Mirror of the app's `TrainCommand`.

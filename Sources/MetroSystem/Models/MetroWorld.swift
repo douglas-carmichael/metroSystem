@@ -240,18 +240,50 @@ final class MetroWorld: ObservableObject {
             case .fuSet:
                 if !t.isEmergencyBrakeApplied { t.emergencyBrakeCounter += 1 }
                 t.isEmergencyBrakeApplied = true
+                t.ebCause = "operatorFU"
             case .fuRelease:
+                // The FU is only releasable at a stand (the AVP re-arms
+                // instantly anyway while a vital condition persists).
+                guard t.speed < 0.5 else { return }
                 t.isEmergencyBrakeApplied = false
+                t.ebCause = "none"
                 if t.status == .emergency { t.status = .stopped }
             case .modeAuto:
                 t.mode = .auto
                 t.manualSpeedRequest = 0
+                t.pupitreLever = 0
             case .modeManual:
                 t.mode = .manual
                 t.manualSpeedRequest = 0
             case .setSpeed:
                 guard t.mode == .manual else { return }
                 t.manualSpeedRequest = max(0, min(Sim.manualSpeedMax, value ?? 0))
+            // Console A22 -- honoured in manual mode (the cover is locked
+            // under automatic driving). KG may always be switched.
+            case .pupitreKG:
+                t.pupitreKG = (value ?? 0) > 0.5
+                if !t.pupitreKG { t.pupitreLever = min(t.pupitreLever, 0) }
+            case .pupitreReverser:
+                guard t.mode == .manual else { return }
+                let v = Int((value ?? 0).rounded())
+                guard (-1...1).contains(v) else { return }
+                // Reversing sense only at a stand; releasing to neutral
+                // is always allowed.
+                if v != 0 && t.speed >= 0.1 && v != t.pupitreReverser { return }
+                t.pupitreReverser = v
+            case .pupitreLever:
+                guard t.mode == .manual else { return }
+                t.pupitreLever = max(-1, min(1, value ?? 0))
+            case .kacopAck:
+                t.kacopSecondsSinceAck = 0
+                t.kacopWarning = false
+                // Acknowledging the dead-man at a stand releases a
+                // vigilance-tripped FU (the reset a dead-man requires).
+                if t.ebCause == "vigilance" && t.speed < 0.5 {
+                    t.isEmergencyBrakeApplied = false
+                    t.ebCause = "none"
+                    if t.status == .emergency { t.status = .stopped }
+                }
             }
         }
     }

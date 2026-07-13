@@ -31,7 +31,10 @@ on-screen buttons.
 | `0..15`   | Train[i] door **OPEN** command |
 | `16..31`  | Train[i] door **CLOSE** command |
 | `32..47`  | Train[i] **emergency brake SET** |
-| `48..63`  | Train[i] **emergency brake RELEASE** |
+| `48..63`  | Train[i] **emergency brake RELEASE** (honoured at a stand) |
+| `64..79`  | Train[i] **KACOP acknowledge** (dead-man, VAL manual driving) |
+| `80..95`  | Train[i] pupitre **KG ON** (console A22 master power) |
+| `96..111` | Train[i] pupitre **KG OFF** |
 
 ## Discrete inputs — FC 02 (read-only)
 
@@ -61,12 +64,21 @@ Derived purely from train telemetry, so it is faithful for remote
 | `224..239` | Adhesion OK (no burst tire) |
 | `240..255` | Safety chain intact (series loop, incl. line mode) |
 
+VAL backend telemetry:
+
+| Address | Meaning |
+| --- | --- |
+| `256..271` | KACOP vigilance warning (manual driving, acknowledge overdue) |
+| `272..287` | Perturbed stopping program (PP) selected |
+
 ## Holding registers — FC 03 read / FC 06 write
 
 | Address | Meaning |
 | --- | --- |
 | `0..15`  | Train[i] mode — read/write, `0` = Manual, `1` = Auto |
-| `16..31` | Train[i] manual speed setpoint ×10 (m/s ×10, `0..200`) |
+| `16..31` | Train[i] manual **CML speed ceiling** ×10 (m/s ×10, `0..200`) |
+| `32..47` | Train[i] pupitre **T/F lever**, signed Int16 percent (−100 full brake … +100 full traction; VAL manual mode) |
+| `48..63` | Train[i] pupitre **reverser** (`0` = neutral, `1` = AV, `2` = AR) |
 
 ## Input registers — FC 04 (read-only)
 
@@ -82,6 +94,8 @@ Per-train telemetry:
 | `80..95`   | Status (0 = stopped, 1 = moving, 2 = emergency brake, 3 = at platform) |
 | `96..111`  | Block (canton) number, `1..10` |
 | `112..127` | Worst tire (0 = OK, 1 = low, 2 = puncture, 3 = burst) |
+| `128..143` | VAL speed program (0 = SF-N normal, 1 = PP perturbed, 2 = SFA arrival, 3 = SFB departure, 4 = HOLD, 5 = ASMD, 6 = ABSENT; `0xFFFF` = not VAL-driven) |
+| `144..159` | KACOP seconds since acknowledge ×10 |
 
 Line-wide scalars (base `1000`):
 

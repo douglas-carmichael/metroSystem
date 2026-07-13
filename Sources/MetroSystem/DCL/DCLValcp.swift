@@ -119,6 +119,24 @@ extension DCLEngine {
         s += tr("valcp.rame.direction") + tr(dirKey) + "\n"
         s += tr("valcp.rame.status")    + tr(statusKey) + "\n"
         s += tr("valcp.rame.mode")      + tr(modeKey) + "\n"
+        // VAL fixed-block telemetry: the received speed program and, when
+        // the FU is in, the safety-rack trip cause. Program mnemonics are
+        // firmware identifiers (SF-N / PP / SFA / SFB / ABS).
+        if let program = VALSpeedProgram(rawValue: t.speedProgram) {
+            s += tr("valcp.rame.program") + program.mnemonic
+            if t.isEmergencyBrakeApplied,
+               let cause = VALTripCause(rawValue: t.ebCause), cause != .none {
+                s += "   (" + tr("valcp.rame.ebcause") + " " + cause.mnemonic + ")"
+            }
+            s += "\n"
+        }
+        // Console A22 state while driving manually.
+        if t.mode == .manual && !t.speedProgram.isEmpty {
+            let rev = t.pupitreReverser > 0 ? "AV" : (t.pupitreReverser < 0 ? "AR" : "0")
+            s += String(format: tr("valcp.rame.pupitre") + "\n",
+                        t.pupitreKG ? "ON" : "OFF", rev, t.pupitreLever * 100,
+                        t.kacopSecondsSinceAck)
+        }
         s += tr("valcp.rame.doors")     + tr(doorKey) + "\n"
         s += tr("valcp.rame.owner")     + tr(ownerKey) + "\n"
         s += String(format: tr("valcp.rame.pax") + "\n", t.passengerCount, Sim.paxCapacity)

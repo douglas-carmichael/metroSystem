@@ -407,6 +407,9 @@ struct DynamicsMonitorWindow: View {
         if train.isDepartureHold { return "hold" }
         if train.mode == .manual { return "manual" }
         if train.status == .stopped { return train.speed > 0.05 ? "stopping" : "idle" }
+        if train.speedProgram == VALSpeedProgram.perturbed.rawValue && train.speedError < -0.1 {
+            return "perturbed"
+        }
         let cruising = train.speed >= train.consigneVitesse * 0.95 && train.consigneVitesse > 0.5
         if train.speedError < -0.3 { return "decel" }
         if cruising                { return "cruise" }
