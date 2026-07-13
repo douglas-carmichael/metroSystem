@@ -174,11 +174,18 @@ unchanged as the **`CBTC_SIM`** backend (`Backends/CBTCSimBackend.swift`)
   board(s) in the STS parts-list nomenclature — the board-swap
   maintenance model of the O'Hare contract. The detail window's ATP
   section shows the same suspect line while an FU is in.
-- **Self-paced exercises** `TP1..TP3.COM` seeded in the COM store
+- **Self-paced exercises** `TP1..TP6.COM` seeded in the COM store
   (`@TP1` — bench reading; `@TP2` — EB-trip diagnosis to the board;
-  `@TP3` — adhesion/anti-skid). Each sets up its own scenario, prints
+  `@TP3` — adhesion/anti-skid; `@TP4` — programmed-stop accuracy
+  against the DOT §4.11 figures; `@TP5` — KACOP vigilance discipline;
+  `@TP6` — tire-pressure triage). Each sets up its own scenario, prints
   bilingual instructions and the expected observations for self-check,
-  and never needs an instructor station or a second node.
+  and never needs an instructor station or a second node. Because the
+  SET RAME qualifiers follow the interface language, the scripts issue
+  gated commands in both spellings — one of each pair reports a benign
+  qualifier error, which the scripts explain. The detail window's
+  TRACTION BENCH strip (II / signed IL / IEX / MHI meters) is the
+  visual companion to TP1.
 
 ## Deliberate simplifications
 

@@ -51,6 +51,13 @@ struct TrainDetailWindow: View {
             VStack(spacing: 14) {
                 DetailBanner(train: train, isLocal: isLocal)
                 GaugeCluster(train: train)
+                // Live bench strip (VAL backend): the chopper quantities
+                // as meters, so the launch reads like an instrumented
+                // run -- II pinned while MHI ramps, IL = MHI x II, the
+                // line current swinging negative under regeneration.
+                if !train.speedProgram.isEmpty {
+                    TractionBenchSection(train: train)
+                }
                 // Two rows of diagnostic sections.
                 HStack(alignment: .top, spacing: 14) {
                     AsservissementSection(train: train)
@@ -239,6 +246,84 @@ private struct CircularGauge: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(8)
+        .overlay(Rectangle().stroke(RetroTheme.amber.opacity(0.5), lineWidth: 1))
+    }
+}
+
+/// The traction-chain bench strip: the four chopper quantities as live
+/// meters (thesis notation II / IL / IEX / MHI). The line-current bar is
+/// zero-centred so regeneration visibly swings it the other way.
+private struct TractionBenchSection: View {
+    let train: Train
+    @EnvironmentObject var language: AppLanguage
+
+    var body: some View {
+        BoxPanel(title: language.t("detail.sec.bench"), accent: RetroTheme.cyan) {
+            HStack(alignment: .top, spacing: 10) {
+                BarMeter(value: train.armatureCurrent,
+                         maxValue: Sim.armatureCurrentMax,
+                         caption: "II",
+                         readout: String(format: "%.0f A", train.armatureCurrent),
+                         color: RetroTheme.green)
+                SignedBarMeter(value: train.lineCurrent,
+                               maxMagnitude: 2 * Sim.armatureCurrentMax,
+                               caption: "IL",
+                               readout: String(format: "%+.0f A", train.lineCurrent))
+                BarMeter(value: train.excitationCurrent,
+                         maxValue: 40,
+                         caption: "IEX",
+                         readout: String(format: "%.1f A", train.excitationCurrent),
+                         color: RetroTheme.green)
+                BarMeter(value: train.modulationRatio,
+                         maxValue: 1.0,
+                         caption: "MHI",
+                         readout: String(format: "%.0f %%", train.modulationRatio * 100),
+                         color: train.modulationRatio >= 0.99 ? RetroTheme.amberBright : RetroTheme.amber)
+            }
+        }
+    }
+}
+
+/// A zero-centred horizontal bar: positive fills right (drawing from the
+/// line), negative fills left in cyan (regenerating into it).
+private struct SignedBarMeter: View {
+    let value: Double
+    let maxMagnitude: Double
+    let caption: String
+    let readout: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(caption)
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(RetroTheme.amberDim)
+                Spacer()
+                Text(readout)
+                    .font(RetroTheme.mono)
+                    .foregroundColor(value < -1 ? RetroTheme.cyan : RetroTheme.amberBright)
+                    .retroGlow()
+            }
+            GeometryReader { geo in
+                let half = geo.size.width / 2
+                let frac = CGFloat(max(-1, min(1, value / maxMagnitude)))
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(RetroTheme.amberDim.opacity(0.25))
+                    // Centre line.
+                    Rectangle()
+                        .fill(RetroTheme.amberDim)
+                        .frame(width: 1)
+                        .offset(x: half)
+                    Rectangle()
+                        .fill(frac >= 0 ? RetroTheme.amberBright : RetroTheme.cyan)
+                        .frame(width: abs(frac) * half)
+                        .offset(x: frac >= 0 ? half : half - abs(frac) * half)
+                }
+            }
+            .frame(height: 12)
+            .overlay(Rectangle().stroke(RetroTheme.amber.opacity(0.5), lineWidth: 1))
+        }
         .padding(8)
         .overlay(Rectangle().stroke(RetroTheme.amber.opacity(0.5), lineWidth: 1))
     }

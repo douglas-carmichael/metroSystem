@@ -392,6 +392,7 @@ enum Strings {
                                     "Traction inhibée (KG / inverseur / portes / FU)")
         add("pupitre.covered",      "Cab cover locked -- automatic driving","Capot verrouillé -- pilotage automatique")
         add("detail.sec.pupitre",   "MANUAL DRIVING -- CONSOLE A22",       "CONDUITE MANUELLE -- PUPITRE A22")
+        add("detail.sec.bench",     "TRACTION BENCH -- CHOPPER QUANTITIES","BANC TRACTION -- GRANDEURS HACHEUR")
         add("detail.atp.program",   "Speed program",                       "Programme de vitesse")
         add("detail.atp.ebcause",   "EB cause",                            "Cause FU")
         add("detail.atp.lru",       "Suspect LRU",                         "Carte suspecte")

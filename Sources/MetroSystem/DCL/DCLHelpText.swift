@@ -412,6 +412,9 @@ extension HelpLibrary {
     $ @TP1     ! traction-chain bench reading (II/IL/IEX/MHI)
     $ @TP2     ! EB-trip diagnosis down to the suspect board (LRU)
     $ @TP3     ! adhesion and the anti-skid function
+    $ @TP4     ! programmed-stop (berthing) accuracy
+    $ @TP5     ! KACOP vigilance discipline
+    $ @TP6     ! tire-pressure triage
     $ TYPE TP1.COM                   ! read an exercise before running it
 
 1 EXAMINE
