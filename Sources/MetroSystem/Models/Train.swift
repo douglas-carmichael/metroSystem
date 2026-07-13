@@ -314,8 +314,19 @@ struct Train: Identifiable, Hashable, Codable {
     var doorInterlockLocked: Bool { !doorsOpen }
 
     /// MA encroachment: inside the vital stop envelope while still moving.
+    /// Under the VAL backend the authority telemetry tracks the ACTIVE
+    /// stop anchor, and two controlled stops are part of normal service:
+    /// the station berth (SFa -- the anchor IS the platform marker) is
+    /// fully exempt, and the perturbed-program stop alarms only above the
+    /// berthing envelope's crossing speed -- a following rame settling
+    /// onto the PP point is routine; anything arriving fast is a genuine
+    /// encroachment (and the AVP is about to trip it anyway).
     var isMAEncroached: Bool {
-        distanceToMA < 2.0 && speed > 0.5
+        if speedProgram == VALSpeedProgram.stationArrival.rawValue { return false }
+        if speedProgram == VALSpeedProgram.perturbed.rawValue {
+            return distanceToMA < 2.0 && speed > 1.6
+        }
+        return distanceToMA < 2.0 && speed > 0.5
     }
 
     /// Worst tire state on the rake (drives the PNEU alarm severity and the

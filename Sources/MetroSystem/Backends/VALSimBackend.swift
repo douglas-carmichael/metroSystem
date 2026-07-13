@@ -34,6 +34,13 @@ final class VALSimBackend: MetroBackendEngine {
     private var timer: Timer?
     private var lastTickAt: Date = .init()
     private var doorOpenSince: [UUID: Date] = [:]
+    /// Return-to-normal hold for intermittent adhesion points: a slip or
+    /// slide alarm stays raised until its condition has been clear this
+    /// long, so a chattering wheel holds ONE row instead of minting a new
+    /// sequence number per flicker (ISA-18.2 off-delay).
+    private var slipHoldUntil: [UUID: Date] = [:]
+    private var slideHoldUntil: [UUID: Date] = [:]
+    private static let adhesionAlarmHold: TimeInterval = 4.0
 
     private let wayside = VALWayside()
     private let onboard = VALOnboard()
@@ -185,6 +192,8 @@ final class VALSimBackend: MetroBackendEngine {
         let localTrains = world.locallyOwned()
         let currentIds = Set(localTrains.map(\.id))
         doorOpenSince = doorOpenSince.filter { currentIds.contains($0.key) }
+        slipHoldUntil = slipHoldUntil.filter { currentIds.contains($0.key) }
+        slideHoldUntil = slideHoldUntil.filter { currentIds.contains($0.key) }
 
         for train in localTrains {
             let source = "RAME \(train.label)"
@@ -198,10 +207,16 @@ final class VALSimBackend: MetroBackendEngine {
             sample(world, source, "FREIN", train.isBrakeFault, .critical, "alarm.msg.brakefault")
             sample(world, source, "CTC_RADIO", train.isSignalFault, .major, "alarm.msg.signalfault")
             // Wheel slip/slide: the injected wet-patch flags OR the
-            // adhesion model actually losing the wheels.
-            sample(world, source, "PATINAGE", train.isPatinage || state.traction.slipping,
+            // adhesion model actually losing the wheels. Debounced with a
+            // return-to-normal hold: slip is intermittent by nature and
+            // must not mint a fresh alarm row per flicker.
+            sample(world, source, "PATINAGE",
+                   held(train.isPatinage || state.traction.slipping,
+                        id: train.id, in: &slipHoldUntil, now: now),
                    .advisory, "alarm.msg.patinage")
-            sample(world, source, "ENRAYAGE", train.isEnrayage || state.traction.sliding,
+            sample(world, source, "ENRAYAGE",
+                   held(train.isEnrayage || state.traction.sliding,
+                        id: train.id, in: &slideHoldUntil, now: now),
                    .advisory, "alarm.msg.enrayage")
             // KACOP vigilance warning (manual driving, dead-man overdue).
             sample(world, source, "VIGILANCE", train.kacopWarning, .minor, "alarm.msg.kacop")
@@ -240,6 +255,21 @@ final class VALSimBackend: MetroBackendEngine {
                 world.clearAlarm(source: source, point: "DOOR_OPEN")
             }
         }
+    }
+
+    /// Off-delay a boolean condition: true refreshes the hold; the result
+    /// stays true until the hold has fully expired.
+    private func held(_ condition: Bool, id: UUID,
+                      in holds: inout [UUID: Date], now: Date) -> Bool {
+        if condition {
+            holds[id] = now.addingTimeInterval(Self.adhesionAlarmHold)
+            return true
+        }
+        if let until = holds[id] {
+            if now < until { return true }
+            holds.removeValue(forKey: id)
+        }
+        return false
     }
 
     /// Sample one process-driven point: raise while the condition holds,

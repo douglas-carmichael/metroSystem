@@ -53,9 +53,20 @@ final class VALTractionChain {
         // ----- capability limits ---------------------------------------
         if demand > 0 {
             demand = min(demand, tractiveCapability(at: v, ts: &ts))
-        } else if demand < 0 {
+        } else if demand < 0 && !request.emergencyBrake {
+            // PEPD proportional reserve bounds SERVICE braking only; the
+            // spring-applied FU is not routed through the PEPD.
             let serviceMax = mass * Sim.nominalBraking * 1.15
             demand = max(demand, -serviceMax)
+        }
+
+        // A rame at rest with no traction torque has no spinning wheels:
+        // when the station sequence parks the chassis (dwell/berth), the
+        // wheel bookkeeping parks with it instead of reading the berth
+        // speed as a slip transient. A genuine standstill spin-up keeps
+        // its wheels -- that path has demand > 0.
+        if v < 0.05 && demand <= 0 {
+            ts.wheelSpeed = [v, v, v, v]
         }
 
         // ----- anti-patinage authority (per car) -----------------------
@@ -80,8 +91,14 @@ final class VALTractionChain {
         train.position = train.position.truncatingRemainder(dividingBy: Sim.trackLength)
         if train.position < 0 { train.position += Sim.trackLength }
 
-        // Wheel speeds relax toward the vehicle when not slipping.
-        for i in ts.wheelSpeed.indices where abs(ts.wheelSpeed[i] - train.speed) < 0.05 {
+        // Wheel speeds relax toward the vehicle when inside the stable
+        // pseudo-slip band. The band scales with speed: zone-1 operation
+        // rides an equilibrium slip of a few percent (lambda ~2-3% at
+        // full effort), which at line speed is several tenths of a m/s --
+        // normal transmission, not patinage. Only a genuine zone-2
+        // runaway diverges beyond it.
+        let resyncBand = max(0.15, 0.04 * train.speed)
+        for i in ts.wheelSpeed.indices where abs(ts.wheelSpeed[i] - train.speed) < resyncBand {
             ts.wheelSpeed[i] = train.speed
         }
 
@@ -215,8 +232,13 @@ final class VALTractionChain {
                 applied += contact
                 let wheelNet = share - contact
                 vR = max(0, vR + wheelNet / wheelMassEq * dt)
-                if share >= 0 { ts.slipping = ts.slipping || vR > v + 0.3 }
-                else { ts.sliding = ts.sliding || vR < v - 0.3 }
+                // Patinage / enrayage means ZONE 2 -- slip past the peak
+                // of the adhesion curve, where the falling characteristic
+                // makes the divergence self-reinforcing. Zone-1
+                // pseudo-slip (lambda under the peak) is how a tire
+                // transmits effort and must not alarm.
+                if share >= 0 { ts.slipping = ts.slipping || lambda > lambdaPeak }
+                else { ts.sliding = ts.sliding || lambda > lambdaPeak }
             }
             ts.wheelSpeed[bogie] = vR
         }
