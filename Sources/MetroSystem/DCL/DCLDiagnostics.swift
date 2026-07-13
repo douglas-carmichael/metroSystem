@@ -145,6 +145,41 @@ extension DCLEngine {
         outRaw(s)
     }
 
+    // MARK: -- diagnostic row layout helpers
+
+    /// Width of the entity sub-column (train id / station name) inside the
+    /// label field. The test-type text starts at this offset on every row,
+    /// and the header places its "Test" heading at the same offset, so the
+    /// column lines up regardless of how wide an individual entity is.
+    /// Trains ("Train 101") need only a narrow column; station names run
+    /// much longer ("Gare Lille Flandres") so they get their own width.
+    var diagRameEntityWidth: Int { 13 }
+    var diagStationEntityWidth: Int { 22 }
+
+    /// Left-pad an entity into the fixed sub-column so the following
+    /// test-type text aligns under the "Test" heading.
+    private func diagEntity(_ entity: String, width: Int) -> String {
+        entity.padding(toLength: width, withPad: " ", startingAt: 0)
+    }
+
+    /// The two-column heading string a test utility hands to
+    /// `startTestUtility`: the entity heading padded into the entity
+    /// sub-column, then the shared "Test" heading above the test-type text.
+    private func diagHeader(_ entityHeaderKey: String, width: Int) -> String {
+        diagEntity(tr(entityHeaderKey), width: width) + tr("diag.col.test")
+    }
+
+    /// Deterministic per-position measured tire pressures with a small
+    /// sensor spread, seeded by the rame number and tire position so a
+    /// "pressure sweep" reports a realistic band instead of a flat
+    /// min == max. Faulted tires keep their (lower) stored pressure.
+    private func measuredTirePressures(of train: Train, seed: Int) -> [Double] {
+        train.tires.map { t in
+            let offset = (Double(((t.id + seed) * 37) % 7) - 3) * 0.08
+            return max(0, t.pressure + offset)
+        }
+    }
+
     // MARK: -- diagnostic step lists
 
     /// FREIN_TEST -- brake-state audit on every rame: the FU chain must be
@@ -155,9 +190,11 @@ extension DCLEngine {
         let fail = tr("diag.status.fail")
         let noRame = tr("diag.reading.noRame")
         let labels = (world?.sortedTrains ?? []).map(\.label)
+        let brakeName = tr("diag.step.frein.rame")
         var steps: [TestStep] = []
         for label in labels {
-            steps.append(TestStep(label: String(format: tr("diag.step.frein.rame"), label)) { [weak self] in
+            let rowLabel = diagEntity(String(format: tr("diag.entity.rame"), label), width: diagRameEntityWidth) + brakeName
+            steps.append(TestStep(label: rowLabel) { [weak self] in
                 guard let self,
                       let train = self.world?.findTrain(label: label)
                 else { return (noRame, fail) }
@@ -179,7 +216,7 @@ extension DCLEngine {
             return ("v3.04 OK", pass)
         })
         startTestUtility(name: tr("diag.test.frein"),
-                         header: tr("diag.col.rame"),
+                         header: diagHeader("diag.col.rame", width: diagRameEntityWidth),
                          steps: steps)
     }
 
@@ -191,9 +228,12 @@ extension DCLEngine {
         let noRame = tr("diag.reading.noRame")
         let trains = world?.sortedTrains ?? []
         let labels = trains.map(\.label)
+        let cycleName = tr("diag.step.portes.cycle")
+        let interlockName = tr("diag.step.portes.interlock")
         var steps: [TestStep] = []
         for label in labels {
-            steps.append(TestStep(label: String(format: tr("diag.step.portes.cycle"), label)) { [weak self] in
+            let rowLabel = diagEntity(String(format: tr("diag.entity.rame"), label), width: diagRameEntityWidth) + cycleName
+            steps.append(TestStep(label: rowLabel) { [weak self] in
                 guard let self,
                       let world = self.world,
                       let train = world.findTrain(label: label)
@@ -216,7 +256,8 @@ extension DCLEngine {
             })
         }
         for label in labels {
-            steps.append(TestStep(label: String(format: tr("diag.step.portes.interlock"), label)) { [weak self] in
+            let rowLabel = diagEntity(String(format: tr("diag.entity.rame"), label), width: diagRameEntityWidth) + interlockName
+            steps.append(TestStep(label: rowLabel) { [weak self] in
                 guard let self,
                       let train = self.world?.findTrain(label: label)
                 else { return (noRame, pass) }
@@ -229,7 +270,7 @@ extension DCLEngine {
             })
         }
         startTestUtility(name: tr("diag.test.portes"),
-                         header: tr("diag.col.rame"),
+                         header: diagHeader("diag.col.rame", width: diagRameEntityWidth),
                          steps: steps)
     }
 
@@ -241,25 +282,37 @@ extension DCLEngine {
         let fail = tr("diag.status.fail")
         let noRame = tr("diag.reading.noRame")
         let labels = (world?.sortedTrains ?? []).map(\.label)
+        let sweepName = tr("diag.step.pneu.read")
+        let spanName  = tr("diag.step.pneu.span")
+        let sweepFmt  = tr("diag.pneu.reading.sweep")
+        let spanFmt   = tr("diag.pneu.reading.span")
         var steps: [TestStep] = []
         for label in labels {
-            steps.append(TestStep(label: String(format: tr("diag.step.pneu.read"), label)) { [weak self] in
+            let seed = Int(label) ?? 0
+            steps.append(TestStep(label: diagEntity(String(format: tr("diag.entity.rame"), label), width: diagRameEntityWidth) + sweepName) { [weak self] in
                 guard let self,
                       let train = self.world?.findTrain(label: label)
                 else { return (noRame, pass) }
-                let minP = train.tires.map(\.pressure).min() ?? 0
-                let maxP = train.tires.map(\.pressure).max() ?? 0
+                let measured = self.measuredTirePressures(of: train, seed: seed)
+                let minP = measured.min() ?? 0
+                let maxP = measured.max() ?? 0
                 let healthy = train.worstTire == .ok
-                return (String(format: "%.1f-%.1f bar", minP, maxP),
+                return (String(format: sweepFmt, minP, maxP),
                         healthy ? pass : fail)
             })
-            steps.append(TestStep(label: String(format: tr("diag.step.pneu.span"), label)) { [weak self] in
+            steps.append(TestStep(label: diagEntity(String(format: tr("diag.entity.rame"), label), width: diagRameEntityWidth) + spanName) { [weak self] in
                 guard let self,
                       let train = self.world?.findTrain(label: label)
                 else { return (noRame, pass) }
-                let avg = train.tires.map(\.pressure).reduce(0, +) / Double(max(1, train.tires.count))
-                let ratio = avg / Sim.tireNominalBar
-                return (String(format: "%.2f ratio", ratio), pass)
+                let measured = self.measuredTirePressures(of: train, seed: seed)
+                let minP = measured.min() ?? 0
+                let maxP = measured.max() ?? 0
+                // Spread across the eight positions expressed against the
+                // nominal pressure -- a flat set reads a few percent, a
+                // faulted tire widens it sharply.
+                let spanPct = Sim.tireNominalBar > 0
+                    ? (maxP - minP) / Sim.tireNominalBar * 100 : 0
+                return (String(format: spanFmt, spanPct), pass)
             })
         }
         let recordsReading = String(format: tr("diag.pneu.reading.records"), labels.count * 2)
@@ -267,7 +320,7 @@ extension DCLEngine {
             return (recordsReading, ok)
         })
         startTestUtility(name: tr("diag.test.pneu"),
-                         header: tr("diag.col.rame"),
+                         header: diagHeader("diag.col.rame", width: diagRameEntityWidth),
                          steps: steps)
     }
 
@@ -277,19 +330,23 @@ extension DCLEngine {
         let pass = tr("diag.status.pass")
         let noWorld = tr("diag.reading.noWorld")
         var steps: [TestStep] = []
-        let litReading = tr("diag.quai.reading.lit")
+        let litFmt = tr("diag.quai.reading.lit")
+        let lampName = tr("diag.step.quai.station")
         for station in world?.stations ?? [] {
-            steps.append(TestStep(label: String(format: tr("diag.step.quai.station"), station.name)) { [weak self] in
+            // Per-platform departure-lamp array size -- deterministic from
+            // the station index so each row reports its own measured count.
+            let lampCount = 22 + (station.id % 4) * 2
+            steps.append(TestStep(label: diagEntity(station.name, width: diagStationEntityWidth) + lampName) { [weak self] in
                 guard self != nil else { return (noWorld, pass) }
                 Thread.sleep(forTimeInterval: 0.15)
-                return (litReading, pass)
+                return (String(format: litFmt, lampCount), pass)
             })
         }
         steps.append(TestStep(label: tr("diag.step.quai.fw")) {
             return ("v1.18 OK", pass)
         })
         startTestUtility(name: tr("diag.test.quai"),
-                         header: tr("diag.col.station"),
+                         header: diagHeader("diag.col.station", width: diagStationEntityWidth),
                          steps: steps)
     }
 
