@@ -189,7 +189,7 @@ enum Strings {
 
         add("credits.title",        "CREDITS",                             "CRÉDITS")
         add("credits.dismiss",      "Click or press ESC to close",         "Cliquez ou appuyez ESC pour fermer")
-        add("credits.role.metro",   "CBTC METRO SIMULATION",               "SIMULATION MÉTRO CBTC")
+        add("credits.role.metro",   "AUTOMATIC METRO SIMULATION",          "SIMULATION MÉTRO AUTOMATIQUE")
         add("credits.role.retro",   "RETRO UI & OpenVMS DCL SHELL",        "UI RÉTRO & SHELL DCL OpenVMS")
 
         add("banner.title",         "PCC — METRO LINE 1",                  "PCC — MÉTRO LIGNE 1")
@@ -209,8 +209,8 @@ enum Strings {
         // LPD VAL-CTRL layered-product splash (localised: the vendor is French).
         add("login.lpd.line1",  "LPD VAL-CTRL for OpenVMS x86-64 V4.2",
                                 "LPD VAL-CTRL pour OpenVMS x86-64 V4.2")
-        add("login.lpd.ctrl",   "Communication-based train control -- line 1 (VAL 208)",
-                                "Contrôle des trains par communication -- ligne 1 (VAL 208)")
+        add("login.lpd.ctrl",   "Driverless automatic train control -- line 1 (VAL 206)",
+                                "Pilotage automatique intégral -- ligne 1 (VAL 206)")
         add("login.lpd.line2",  "Diagnostic images available (RUN <image> or DIAGNOSE):",
                                 "Images de diagnostic disponibles (RUN <image> ou DIAGNOSE) :")
         add("login.lpd.frein",  "  RUN FREIN_TEST       Brake-state audit on every train",

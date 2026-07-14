@@ -35,7 +35,7 @@ enum TravelDirection: Double, Codable {
 }
 
 enum TrainMode: String, Codable, CaseIterable {
-    case auto       // conduite automatique intégrale (CBTC)
+    case auto       // conduite automatique intégrale
     case manual     // conduite manuelle limitée
 }
 

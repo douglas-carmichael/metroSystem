@@ -1,7 +1,8 @@
 # MetroSystem
 
-A native macOS / SwiftUI **CBTC metro simulator** with a retro VT320 /
-OpenVMS aesthetic, built on the
+A native macOS / SwiftUI **automated-metro simulator** — the fixed-block
+VAL system by default, with moving-block CBTC / PRATIC backends — in a
+retro VT320 / OpenVMS aesthetic, built on the
 [elevatorSystem](https://github.com/lapatatedouce59/elevatorSystem)
 retro harness. One app, four windows, bilingual EN / FR throughout, with a
 headless cluster daemon and a Modbus TCP interface for external tooling.
@@ -39,12 +40,17 @@ screenshots.
 
 ## Simulation
 
-A 60 Hz PLC-scan `MetroWorld` where
-each train runs the asservissement speed regulation (braking curve +
-proportional control + emergency-brake envelope + tire-adhesion / patinage
-/ enrayage model) against a movement authority recomputed every scan by the
-wayside zone controller, with station dwell, passenger exchange, and
-service-provisoire shuttle logic.
+A 60 Hz scan structured like the real VAL equipment split (not CBTC —
+the original VAL is a fixed-block automatism): the wayside selects a
+track-encoded speed program per rame (SF normal / PP perturbed / station
+SFa-SFb, 25 km/h switch zones), the on-board SAFETY rack holds off the
+emergency brake only while every condition proves positive (survitesse,
+block penetration, rollback, KACOP, A/B string voting), the DRIVE rack —
+or console A22 in manual — shapes the jerk-limited consigne, and the
+image-série traction chain (adhesion, patinage / enrayage, Davis
+resistance) integrates the physics; station dwell, passenger exchange
+and service-provisoire shuttle logic run on top. The original
+moving-block scan survives as the `CBTC_SIM` backend.
 
 ## Multi-node networking
 
@@ -193,7 +199,7 @@ work in either mode.
 
 ## Credits
 
-- **CBTC metro simulation** — Douglas Carmichael.
+- **Automatic metro simulation** — Douglas Carmichael.
 - **Retro UI, OpenVMS DCL shell and simulation harness** — adapted from
   [elevatorSystem](https://github.com/lapatatedouce59/elevatorSystem)
   (Amaury Crocquefer; macOS/SwiftUI port Douglas Carmichael).
