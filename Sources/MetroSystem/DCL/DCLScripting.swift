@@ -58,6 +58,52 @@ extension DCLEngine {
         var gosubReturns: [Int] = []
         var exitRequested = false
 
+        // Apply one control action. Recurses for IF ... THEN <control>:
+        // the chosen branch may itself be a GOTO/GOSUB/EXIT/assignment,
+        // which the general dispatcher doesn't know -- it must come back
+        // through this handler, not go to execute().
+        func apply(_ action: ScriptAction) async {
+            switch action {
+            case .exit(let status):
+                if let st = status { lastStatus = st }
+                exitRequested = true
+            case .goto(let label):
+                if let target = labels[label.uppercased()] {
+                    pc = target + 1
+                } else {
+                    output += "%DCL-W-USGOTO, target of GOTO not found -- \(label)\n"
+                    exitRequested = true
+                }
+            case .gosub(let label):
+                if let target = labels[label.uppercased()] {
+                    gosubReturns.append(pc)
+                    pc = target + 1
+                } else {
+                    output += "%DCL-W-USGOTO, target of GOSUB not found -- \(label)\n"
+                    exitRequested = true
+                }
+            case .returnSub:
+                if let dest = gosubReturns.popLast() {
+                    pc = dest
+                } else {
+                    output += "%DCL-W-NORETURN, no matching GOSUB\n"
+                    exitRequested = true
+                }
+            case .ifThen(let cmd):
+                guard !cmd.isEmpty else { return }
+                if let nested = parseScriptControl(cmd) {
+                    await apply(nested)
+                } else {
+                    let result = await execute(cmd)
+                    if !result.isEmpty {
+                        output += result + (result.hasSuffix("\n") ? "" : "\n")
+                    }
+                }
+            case .assignment(let key, let value):
+                symbols[key.uppercased()] = value
+            }
+        }
+
         while pc < lines.count && !exitRequested {
             let rawLine = lines[pc]
             pc += 1
@@ -83,40 +129,7 @@ extension DCLEngine {
 
             // Interpret control verbs that the dispatcher doesn't know.
             if let action = parseScriptControl(stripped) {
-                switch action {
-                case .exit(let status):
-                    if let st = status { lastStatus = st }
-                    exitRequested = true
-                case .goto(let label):
-                    if let target = labels[label.uppercased()] {
-                        pc = target + 1
-                    } else {
-                        output += "%DCL-W-USGOTO, target of GOTO not found -- \(label)\n"
-                        exitRequested = true
-                    }
-                case .gosub(let label):
-                    if let target = labels[label.uppercased()] {
-                        gosubReturns.append(pc)
-                        pc = target + 1
-                    } else {
-                        output += "%DCL-W-USGOTO, target of GOSUB not found -- \(label)\n"
-                        exitRequested = true
-                    }
-                case .returnSub:
-                    if let dest = gosubReturns.popLast() {
-                        pc = dest
-                    } else {
-                        output += "%DCL-W-NORETURN, no matching GOSUB\n"
-                        exitRequested = true
-                    }
-                case .ifThen(let cmd):
-                    let result = await execute(cmd)
-                    if !result.isEmpty {
-                        output += result + (result.hasSuffix("\n") ? "" : "\n")
-                    }
-                case .assignment(let key, let value):
-                    symbols[key.uppercased()] = value
-                }
+                await apply(action)
                 continue
             }
 
