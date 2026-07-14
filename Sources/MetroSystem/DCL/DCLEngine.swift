@@ -690,6 +690,11 @@ final class DCLEngine: ObservableObject {
                     let (n, v) = splitQual(body)
                     qualifiers.append((n, v))
                 }
+            } else if raw.hasPrefix("\"") {
+                // A quoted string is one literal positional -- never mine
+                // it for qualifiers (WRITE SYS$OUTPUT "... /TIRE=3" must
+                // echo its slash verbatim).
+                positional.append(raw)
             } else {
                 // Non-first tokens may also carry attached qualifiers, e.g.
                 // SET LIGNE/NORMAL -- the keyword is LIGNE and /NORMAL
