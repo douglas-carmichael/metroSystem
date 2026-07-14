@@ -31,6 +31,11 @@ mirror is what makes every existing surface work unmodified:
 - PRATIC-specific state — link status, position confidence, MA age,
   wayside stations, turnouts, balises — surfaces through
   `SHOW PRATIC` / `SET PRATIC` and the SCADA annunciator.
+- The PRATIC wire carries no electrical telemetry, so the mirror
+  synthesizes the TCMS traction picture (current, torque, the
+  motoring/braking flags, line-voltage sag) from the train's dynamics —
+  the same plausible model the CBTC_SIM backend paints. The VAL bench
+  quantities (II/IL/IEX/MHI) stay zero: they are VAL equipment.
 
 ## The CBTC domain (what is modelled)
 

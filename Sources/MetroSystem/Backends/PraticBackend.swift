@@ -184,6 +184,14 @@ extension PraticNetwork {
     }
 
     private func fill(_ mirror: inout Train, from train: PraticTrain) {
+        // The PRATIC domain model carries no acceleration or electrical
+        // telemetry, so the TCMS rows (traction current/torque, the
+        // motoring/braking flags) would sit at zero. Estimate the
+        // acceleration from the mirror's previous speed at the scan
+        // cadence (smoothed against jitter), then synthesize the same
+        // plausible traction picture the CBTC_SIM backend paints.
+        let rawAccel = max(-3.0, min(3.0, (train.speed - mirror.speed) * Sim.praticScanHz))
+        mirror.acceleration = mirror.acceleration * 0.8 + rawAccel * 0.2
         mirror.position = train.position
         mirror.speed = train.speed
         mirror.travelDirection = train.direction
@@ -197,6 +205,17 @@ extension PraticNetwork {
         } else {
             mirror.status = train.speed > 0.05 ? .moving : .stopped
         }
+        let motoring = mirror.acceleration > 0.05
+        let braking = mirror.acceleration < -0.05
+        mirror.tractionCurrent = motoring
+            ? min(1500, 400 + train.speed * 60)
+            : (braking ? 120 : (train.speed > 0.05 ? 40 : 0))
+        mirror.tractionTorque = max(-100, min(100, mirror.acceleration / Sim.maxAcceleration * 100))
+        mirror.mainVoltage = 750 - mirror.tractionCurrent * 0.02
+        mirror.cvsOutputVoltage = 112.0 - (750 - mirror.mainVoltage) * 0.01
+        mirror.lightingCurrent = mirror.areLightsOn
+            ? (mirror.isLoadSheddingActive ? 5.0 : 15.0)
+            : 0.0
     }
 
     /// Direction-aware distance from the train to an absolute loop
