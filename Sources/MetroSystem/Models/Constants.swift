@@ -91,6 +91,23 @@ enum Sim {
     /// engaged for a recovery move.
     static let kibsRecoveryCeiling: Double = 3.0 // m/s
 
+    // Switch zones (DOT §3.5.2.9 + Table 3-1): a crossover behind each
+    // historic terminus and the depot access ladder. On the loop the
+    // NORMAL position is the through route; REVERSE (or a switch in
+    // motion) bars the zone -- approaching rames take a perturbed stop
+    // before it and penetration trips the FU.
+    static let switchZones: [(id: Int, name: String, entry: Double, exit: Double)] = [
+        (1, "AIG CHU",    82.0, 106.0),   // crossover behind CHU - Eurasanté
+        (2, "AIG 4CANT", 882.0, 906.0),   // crossover behind 4 Cantons
+        (3, "AIG DEPOT", 448.0, 472.0),   // depot access, interstation block 5
+    ]
+    static let switchZoneSpeed: Double = 7.0     // m/s (~25 km/h through a switch)
+    static let switchThrowTime: Double = 3.0     // s lock-to-lock
+
+    // AVP redundancy (DOT §3.5.2.15): two parallel equipment strings,
+    // remotely selectable, compared in AND (any disagreement stops the
+    // rame) or OR (runs on the surviving string, with a warning).
+
     // Station / passenger model.
     static let stationApproachWindow: Double = 150.0   // m lookahead for a stop point
     static let stationStopTolerance: Double = 1.5      // m from the stop marker

@@ -54,6 +54,16 @@ enum Sim {
     static let kacopWarningDelay: Double = 14.0
     static let kacopTripDelay: Double = 20.0
 
+    // Switch zones (mirror of the app's; on a headless daemon node the
+    // points are always locked on the through route, so only the 25 km/h
+    // zone speed program applies -- throws are app-side).
+    static let switchZones: [(id: Int, entry: Double, exit: Double)] = [
+        (1,  82.0, 106.0),
+        (2, 882.0, 906.0),
+        (3, 448.0, 472.0),
+    ]
+    static let switchZoneSpeed: Double = 7.0
+
     static let stationApproachWindow: Double = 150.0
     static let stationStopTolerance: Double = 1.5
     static let dwellMin: Double = 5.0
@@ -138,6 +148,9 @@ enum VALTripCause: String, Codable {
     case lineEmergency
     case controllerAlarm
     case operatorFU
+    case switchZone
+    case avpString
+    case avpDiscrepancy
 }
 
 /// Mirror of the app's `Train`. Property names and CodingKeys must match
@@ -192,6 +205,12 @@ struct Train: Identifiable, Codable {
     var kacopSecondsSinceAck: Double = 0
     var kacopWarning: Bool = false
 
+    // AVP redundancy (mirror of the app's fields).
+    var avpActiveString: String = "A"
+    var avpVotingAnd: Bool = true
+    var avpStringAFault: Bool = false
+    var avpStringBFault: Bool = false
+
     struct Tire: Identifiable, Codable {
         let id: Int
         var pressure: Double = Sim.tireNominalBar
@@ -234,6 +253,7 @@ struct Train: Identifiable, Codable {
         case pupitreKG, pupitreReverser, pupitreLever
         case pupitreKIBS, pupitreKPH
         case kacopSecondsSinceAck, kacopWarning
+        case avpActiveString, avpVotingAnd, avpStringAFault, avpStringBFault
         case mainVoltage, batteryVoltage, tractionCurrent, tractionTorque
         case compressorPressure, isCompressorRunning, interiorTemperature
         case armatureCurrent, lineCurrent, excitationCurrent, modulationRatio
@@ -293,6 +313,10 @@ struct Train: Identifiable, Codable {
         pupitreKPH = try c.decodeIfPresent(Bool.self, forKey: .pupitreKPH) ?? false
         kacopSecondsSinceAck = try c.decodeIfPresent(Double.self, forKey: .kacopSecondsSinceAck) ?? 0
         kacopWarning = try c.decodeIfPresent(Bool.self, forKey: .kacopWarning) ?? false
+        avpActiveString = try c.decodeIfPresent(String.self, forKey: .avpActiveString) ?? "A"
+        avpVotingAnd = try c.decodeIfPresent(Bool.self, forKey: .avpVotingAnd) ?? true
+        avpStringAFault = try c.decodeIfPresent(Bool.self, forKey: .avpStringAFault) ?? false
+        avpStringBFault = try c.decodeIfPresent(Bool.self, forKey: .avpStringBFault) ?? false
         tires = try c.decodeIfPresent([Tire].self, forKey: .tires)
             ?? (1...Sim.tireCount).map { Tire(id: $0) }
         mainVoltage = try c.decodeIfPresent(Double.self, forKey: .mainVoltage) ?? 750.0

@@ -52,6 +52,10 @@ final class LineDiscipline {
             dcl.handleDiagnosticMenuKey(bytes)
             return
         }
+        if case .lruBrowser = dcl.liveMode {
+            dcl.handleLRUBrowserKey(bytes)
+            return
+        }
         if case .screenEditor = dcl.liveMode {
             dcl.handleScreenEditorKey(bytes)
             return

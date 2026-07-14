@@ -652,13 +652,26 @@ extension HelpLibrary {
                                          interlock bypassed for recovery
                                          moves, 3 m/s creep, alarmed)
                          /KPH=ON|OFF    (headlights)
+                         /AVP=A|B       (/PA: active safety string)
+                         /VOTING=AND|OR (/VOTE=ET|OU: string comparison;
+                                         AND stops the rame on any string
+                                         disagreement, OR runs degraded
+                                         on the surviving string)
                          /PORTES=ON|OFF   (/DOOR)
                          /TRACTION=ON|OFF (/ENGINE)
                          /FREIN=ON|OFF    (/BRAKE)
                          /CTC=ON|OFF      (/SIGNAL)
                          /PATINAGE=ON|OFF (/SLIP)
                          /ENRAYAGE=ON|OFF (/SLIDE)
+                         /CHAINEA=ON|OFF  (/STRINGA: PA string A fault)
+                         /CHAINEB=ON|OFF  (/STRINGB: PA string B fault)
                          /PNEU=n          (/TIRE)
+
+  AVP redundancy: each rame carries two parallel safety strings,
+  PA(A) and PA(B). A fault on the ACTIVE string trips the FU (no
+  positive data); a fault on the standby string trips only under
+  AND voting -- select the healthy string or switch the comparison
+  to OR, clear the fault, then release the FU.
 
 3 LIGNE
   Sets a line-wide exploitation mode.
@@ -666,7 +679,16 @@ extension HelpLibrary {
     VALCP SET LIGNE /SERVICE=ON|OFF
                     /EMERGENCY=ON|OFF
                     /SP=(from,to[,interval-s])
+                    /SWITCH=(n,NORMAL|REVERSE)   (/AIGUILLE=(n,NORMALE|DEVIEE))
                     /NORMAL
+
+  Switches: each crossover's zone encodes a 25 km/h program. A throw
+  cycles the points for 3 s (lock-to-lock); while unlocked, or locked
+  off the through route, the zone is barred -- approaching rames take
+  a perturbed stop before the points and entering the zone trips the
+  FU (recover with /MANUAL + /KIBS creep). The interlock refuses a
+  throw while any rame occupies the zone. SHOW LINE lists the switch
+  table.
 
 2 HELP
   Displays the detailed VALCP command reference.
@@ -927,6 +949,19 @@ extension HelpLibrary {
 
     RUN LRU_LOOKUP
 
+2 LRU_DIR
+  Opens the interactive LRU directory -- a full-screen DECforms-style
+  catalogue of every board in the simulated VAL equipment (OBCU SAFETY
+  and DRIVE racks, traction chain, console A22, wayside WCU and DOCU),
+  with each board's function, the FU trip mnemonics it explains and
+  the source reference.
+
+  Up/down arrows move the selection; typing fills the Find field and
+  filters the list live (DEL erases, CTRL/U clears); CTRL/Z or ESC ESC
+  leaves the form.
+
+    RUN LRU_DIR
+
 1 SCRIPTING
   An overview of the DCL command-procedure language. Every command line
   in a procedure begins with a dollar sign ($); a line beginning with $!
@@ -948,6 +983,21 @@ extension HelpLibrary {
 
   SHOW SYMBOL lists the defined symbols. The read-only symbols $STATUS,
   $SEVERITY, $PID, $PROCESS and $RESTART are always available.
+
+  PCC$LANGUAGE is a read-only built-in symbol holding the active
+  console language, "EN" or "FR". It resolves live (switching the
+  language changes it immediately) and cannot be shadowed by a user
+  symbol. Procedures branch on it to keep their output and their
+  language-gated qualifiers in the operator's language -- the TP kit
+  does exactly this:
+
+    $ IF PCC$LANGUAGE .EQS. "FR" THEN GOTO FR
+    $ ! ... English block ...
+    $ EXIT
+    $FR:
+    $ ! ... bloc francais ...
+
+  The lexical function F$LANGUAGE() returns the same value.
 
 2 Substitution
   Enclose a symbol name in apostrophes to substitute its value into a
@@ -980,7 +1030,10 @@ extension HelpLibrary {
 
       F$LENGTH  F$EXTRACT  F$LOCATE  F$INTEGER  F$STRING
       F$EDIT    F$TIME     F$USER    F$MODE     F$ENVIRONMENT
-      F$SEARCH  F$TRNLNM   F$PID
+      F$SEARCH  F$TRNLNM   F$PID     F$LANGUAGE
+
+  F$LANGUAGE() returns the active console language, "EN" or "FR"
+  (the same value as the read-only symbol PCC$LANGUAGE).
 
   Example:
 

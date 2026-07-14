@@ -42,6 +42,9 @@ enum TrainCommandKind: String, Codable {
     case pupitreKIBS      // safety-loop inhibition (value: 1 = on, 0 = off)
     case pupitreKPH       // headlights (value: 1 = on, 0 = off)
     case kacopAck         // dead-man acknowledgment (momentary press)
+    // AVP redundancy (DOT §3.5.2.15) -- remote exploitation commands.
+    case avpSelect        // active string (value: 0 = A, 1 = B)
+    case avpVoting        // comparison mode (value: 1 = AND, 0 = OR)
 }
 
 /// A control request for a specific remote rame. `value` is only

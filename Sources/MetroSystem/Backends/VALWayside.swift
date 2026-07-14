@@ -30,6 +30,57 @@ final class VALWayside {
     /// DOCU departure clocks per terminus station (SP headway pacing).
     private var lastTerminusDeparture: [Int: Date] = [:]
 
+    // MARK: -- switches (aiguilles, DOT §3.5.2.9)
+
+    /// One physical switch and its zone. NORMAL is the through route;
+    /// REVERSE (or a switch in motion, 3 s lock-to-lock) bars the zone.
+    struct SwitchStatus {
+        var reversed: Bool = false
+        var movingUntil: Date? = nil
+        func locked(at now: Date) -> Bool {
+            guard let until = movingUntil else { return true }
+            return now >= until
+        }
+    }
+    private(set) var switches: [Int: SwitchStatus] =
+        Dictionary(uniqueKeysWithValues: Sim.switchZones.map { ($0.id, SwitchStatus()) })
+
+    /// SP turnback route-setting: the crossover throw a terminus rame is
+    /// waiting on, keyed by rame id.
+    private var turnbackRouteSetUntil: [UUID: Date] = [:]
+
+    enum SwitchThrowResult { case ok, zoneOccupied, noSuchSwitch }
+
+    /// Operator throw with the DOT interlock: a switch may not be moved
+    /// while any vehicle is inside its zone.
+    func throwSwitch(id: Int, reversed: Bool, trains: [Train], now: Date) -> SwitchThrowResult {
+        guard let zone = Sim.switchZones.first(where: { $0.id == id }),
+              var status = switches[id] else { return .noSuchSwitch }
+        if trains.contains(where: { $0.position >= zone.entry && $0.position < zone.exit }) {
+            return .zoneOccupied
+        }
+        if status.reversed != reversed || !(status.locked(at: now)) {
+            status.reversed = reversed
+            status.movingUntil = now.addingTimeInterval(Sim.switchThrowTime)
+            switches[id] = status
+        }
+        return .ok
+    }
+
+    /// Snapshot for SHOW LINE and the ROUTE alarms.
+    func switchTable(now: Date) -> [(id: Int, name: String, entry: Double, exit: Double,
+                                     reversed: Bool, locked: Bool)] {
+        Sim.switchZones.map { z in
+            let st = switches[z.id] ?? SwitchStatus()
+            return (z.id, z.name, z.entry, z.exit, st.reversed, st.locked(at: now))
+        }
+    }
+
+    private func routeAvailable(_ id: Int, now: Date) -> Bool {
+        guard let st = switches[id] else { return true }
+        return st.locked(at: now) && !st.reversed
+    }
+
     // MARK: -- vehicle detection
 
     /// Blocks occupied by each known train (local AND remote), keyed by
@@ -119,6 +170,34 @@ final class VALWayside {
             probe = next
         }
 
+        // Switch zones (DOT §3.5.2.9): the crossover geometry always
+        // encodes its 25 km/h program; a switch in motion or off the
+        // through route additionally bars the zone -- perturbed stop
+        // before the points, and a rame inside a barred zone is a
+        // detected violation (FU).
+        if let zone = nearestSwitchZone(for: train) {
+            tg.switchZone = zone.profile
+            if !routeAvailable(zone.id, now: now) {
+                tg.switchBarred = true
+                if zone.inside {
+                    tg.switchViolation = true
+                } else {
+                    let anchor = wrapped(zone.profile.entry -
+                        train.travelDirection.rawValue * Sim.perturbedStopMargin)
+                    let dSwitch = VALTrackDatabase.distanceAhead(
+                        from: train.position, to: anchor, direction: train.travelDirection)
+                    let dExisting = tg.stopAnchor.map {
+                        VALTrackDatabase.distanceAhead(from: train.position, to: $0,
+                                                       direction: train.travelDirection)
+                    } ?? .infinity
+                    if tg.program != .perturbed || dSwitch < dExisting {
+                        tg.program = .perturbed
+                        tg.stopAnchor = anchor
+                    }
+                }
+            }
+        }
+
         // SP barriers: the guideway beyond the section termini is not
         // energized. When the very next block lies outside the section,
         // treat its boundary as a perturbed stop (margin 0 -- the old
@@ -165,16 +244,73 @@ final class VALWayside {
         // Terminus turnback order under SP (DOCU route function): a rame
         // docked at a section terminus pointing at the barrier receives
         // the opposite direction bits once its exchange is complete.
+        // Where a crossover sits behind the terminus, the DOCU first sets
+        // the turnback route -- the points cycle lock-to-lock (3 s) and
+        // the order is withheld until they relock.
         if let sp = world.activeSP,
            train.status == .docked, train.speed == 0, train.paxRemaining == 0,
            let last = train.lastServicedStationId {
             if (last == sp.startStationId && train.travelDirection == .reverse) ||
                (last == sp.endStationId && train.travelDirection == .forward) {
-                tg.turnback = true
+                if let zoneId = adjacentSwitchZone(to: train.position) {
+                    if let until = turnbackRouteSetUntil[train.id] {
+                        if now >= until {
+                            tg.turnback = true
+                            turnbackRouteSetUntil.removeValue(forKey: train.id)
+                        }
+                    } else if let zone = Sim.switchZones.first(where: { $0.id == zoneId }),
+                              !world.trains.contains(where: {
+                                  $0.id != train.id &&
+                                  $0.position >= zone.entry && $0.position < zone.exit
+                              }) {
+                        var st = switches[zoneId] ?? SwitchStatus()
+                        st.movingUntil = now.addingTimeInterval(Sim.switchThrowTime)
+                        switches[zoneId] = st
+                        turnbackRouteSetUntil[train.id] = st.movingUntil
+                    }
+                } else {
+                    tg.turnback = true
+                }
             }
         }
 
         return tg
+    }
+
+    /// Nearest switch zone containing the rame or within approach
+    /// lookahead of it, direction-aware.
+    private func nearestSwitchZone(for train: Train)
+        -> (id: Int, profile: (entry: Double, exit: Double, code: Double),
+            inside: Bool, approach: Double)? {
+        let lookahead = 250.0
+        var best: (id: Int, profile: (entry: Double, exit: Double, code: Double),
+                   inside: Bool, approach: Double)? = nil
+        for z in Sim.switchZones {
+            let entryPoint = train.travelDirection == .forward ? z.entry : z.exit
+            let exitPoint  = train.travelDirection == .forward ? z.exit  : z.entry
+            let dEntry = VALTrackDatabase.distanceAhead(from: train.position, to: entryPoint,
+                                                        direction: train.travelDirection)
+            let dExit  = VALTrackDatabase.distanceAhead(from: train.position, to: exitPoint,
+                                                        direction: train.travelDirection)
+            let inside = dExit < dEntry
+            let approach = inside ? 0 : dEntry
+            guard inside || dEntry < lookahead else { continue }
+            if best == nil || approach < best!.approach {
+                best = (z.id, (entryPoint, exitPoint, Sim.switchZoneSpeed), inside, approach)
+            }
+        }
+        return best
+    }
+
+    /// Crossover within reversal reach of a terminus platform.
+    private func adjacentSwitchZone(to position: Double) -> Int? {
+        for z in Sim.switchZones {
+            let mid = (z.entry + z.exit) / 2
+            let direct = abs(mid - position)
+            let dist = min(direct, Sim.trackLength - direct)
+            if dist < 120 { return z.id }
+        }
+        return nil
     }
 
     /// DOCU departure authorization. Returns true while departure must be

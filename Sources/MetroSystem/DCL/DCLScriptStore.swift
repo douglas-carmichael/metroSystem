@@ -168,230 +168,277 @@ final class DCLScriptStore {
         // Self-paced training exercise kit (TP -- travaux pratiques).
         // Each script sets up its own scenario, states the objective and
         // prints the expected observations for self-checking -- no
-        // instructor console or second node is ever required. Output
-        // lines carry EN and FR (script bodies are plain files, not the
-        // localisation table). Because the SET RAME qualifiers follow
-        // the interface language, gated commands are issued in BOTH
-        // spellings -- one succeeds, the other reports a benign
-        // qualifier error (each script says so). Kit files re-seed when
-        // the [TPKIT V2] tag is missing, replacing stale copies.
+        // instructor console or second node is ever required. The
+        // scripts read the PCC$LANGUAGE builtin symbol and branch, so
+        // each language sees only its own text and its own (language-
+        // gated) qualifier spellings. Kit files re-seed when the
+        // [TPKIT V3] tag is missing, replacing stale copies.
         for kit in ["TP1.COM", "TP1_FIN.COM", "TP2.COM", "TP3.COM",
                     "TP4.COM", "TP5.COM", "TP6.COM"] {
             reseedKit(name: kit)
         }
         seed(name: "TP1.COM", body: """
-        $ ! [TPKIT V2] TP1.COM -- Traction-chain bench reading
+        $ ! [TPKIT V3] TP1.COM -- Traction-chain bench reading
         $ !                      Lecture de la chaine de traction au banc
-        $ ! Command pairs: the CLI vocabulary follows the interface
-        $ ! language, so one spelling of each pair reports a qualifier
-        $ ! error. / Une commande de chaque paire signale un
-        $ ! qualificatif inconnu selon la langue. C'est normal.
+        $ IF PCC$LANGUAGE .EQS. "FR" THEN GOTO FR
         $ WRITE SYS$OUTPUT "=== TP1: TRACTION CHAIN BENCH READING ==="
-        $ WRITE SYS$OUTPUT "=== TP1: LECTURE DE LA CHAINE DE TRACTION ==="
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Goal: relate the chopper quantities II, IL, IEX and MHI."
-        $ WRITE SYS$OUTPUT "But : relier les grandeurs hacheur II, IL, IEX et MHI."
-        $ VALCP SET RAME 101 /MANU
+        $ WRITE SYS$OUTPUT "Rame 101: manual driving, KG on, reverser AV, 80% traction."
+        $ VALCP SET RAME 101 /MANUAL
         $ VALCP SET RAME 101 /SPEED=9
-        $ VALCP SET RAME 101 /VITESSE=9
         $ VALCP SET RAME 101 /KG=ON
         $ VALCP SET RAME 101 /REVERSER=AV
-        $ VALCP SET RAME 101 /INVERSEUR=AV
         $ VALCP SET RAME 101 /LEVER=80
-        $ VALCP SET RAME 101 /MANIPULATEUR=80
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "A. Open rame 101's DETAIL window: TRACTION BENCH meters."
-        $ WRITE SYS$OUTPUT "   Ouvrez la fenetre DETAIL de la rame 101 : banc traction."
         $ WRITE SYS$OUTPUT "   Launch: II pinned while MHI climbs -- IL = MHI x II"
         $ WRITE SYS$OUTPUT "   (a buck converter). The governor caps this run at 9 m/s."
-        $ WRITE SYS$OUTPUT "   Lancement : II a sa limite pendant que MHI monte --"
-        $ WRITE SYS$OUTPUT "   IL = MHI x II (hacheur serie). Limiteur regle a 9 m/s."
         $ WRITE SYS$OUTPUT "   Acknowledge KACOP within 14 s: SET RAME 101 /KACOP"
-        $ WRITE SYS$OUTPUT "   Acquittez le KACOP sous 14 s : SET RAME 101 /KACOP"
-        $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "B. Then run @TP1_FIN and watch the same rame in AUTOMATIC"
         $ WRITE SYS$OUTPUT "   on the fast stretch: at ~11-13 m/s MHI saturates (100%)"
         $ WRITE SYS$OUTPUT "   and IEX/II drops 0.059 -> 0.034: field weakening."
-        $ WRITE SYS$OUTPUT "   Lancez ensuite @TP1_FIN et observez la meme rame en"
-        $ WRITE SYS$OUTPUT "   AUTOMATIQUE sur le trancon rapide : vers 11-13 m/s MHI"
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Verify any time: VALCP SHOW RAME 101.  Finish: @TP1_FIN"
+        $ EXIT
+        $FR:
+        $ WRITE SYS$OUTPUT "=== TP1: LECTURE DE LA CHAINE DE TRACTION ==="
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "But : relier les grandeurs hacheur II, IL, IEX et MHI."
+        $ WRITE SYS$OUTPUT "Rame 101 : conduite manuelle, KG, inverseur AV, traction 80 %."
+        $ VALCP SET RAME 101 /MANUEL
+        $ VALCP SET RAME 101 /VITESSE=9
+        $ VALCP SET RAME 101 /KG=ON
+        $ VALCP SET RAME 101 /INVERSEUR=AV
+        $ VALCP SET RAME 101 /MANIPULATEUR=80
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "A. Ouvrez la fenetre DETAIL de la rame 101 : banc traction."
+        $ WRITE SYS$OUTPUT "   Lancement : II a sa limite pendant que MHI monte --"
+        $ WRITE SYS$OUTPUT "   IL = MHI x II (hacheur serie). Limiteur regle a 9 m/s."
+        $ WRITE SYS$OUTPUT "   Acquittez le KACOP sous 14 s : SET RAME 101 /KACOP"
+        $ WRITE SYS$OUTPUT "B. Lancez ensuite @TP1_FIN et observez la meme rame en"
+        $ WRITE SYS$OUTPUT "   AUTOMATIQUE sur le troncon rapide : vers 11-13 m/s MHI"
         $ WRITE SYS$OUTPUT "   sature (100 %) et IEX/II passe de 0,059 a 0,034 :"
         $ WRITE SYS$OUTPUT "   defluxage."
         $ WRITE SYS$OUTPUT ""
-        $ WRITE SYS$OUTPUT "Verify any time / Verifiez a tout moment : VALCP SHOW RAME 101"
+        $ WRITE SYS$OUTPUT "Verifiez : VALCP SHOW RAME 101.  Terminer : @TP1_FIN"
         $ EXIT
         """)
         seed(name: "TP1_FIN.COM", body: """
-        $ ! [TPKIT V2] TP1_FIN.COM -- brake rame 101 and hand it back to
-        $ !             automatic. / Freine la rame 101 et la rend a
-        $ !             l'automatique. (One line of each command pair
-        $ !             errors by language -- normal.)
+        $ ! [TPKIT V3] TP1_FIN.COM -- brake rame 101, hand back to automatic
+        $ !             freine la rame 101, retour a l'automatique
+        $ IF PCC$LANGUAGE .EQS. "FR" THEN GOTO FR
         $ VALCP SET RAME 101 /LEVER=-100
-        $ VALCP SET RAME 101 /MANIPULATEUR=-100
         $ WAIT 00:00:06
         $ VALCP SET RAME 101 /LEVER=0
+        $ VALCP SET RAME 101 /KG=OFF
+        $ VALCP SET RAME 101 /AUTOMATIC
+        $ WRITE SYS$OUTPUT "Rame 101 back in automatic."
+        $ EXIT
+        $FR:
+        $ VALCP SET RAME 101 /MANIPULATEUR=-100
+        $ WAIT 00:00:06
         $ VALCP SET RAME 101 /MANIPULATEUR=0
         $ VALCP SET RAME 101 /KG=OFF
-        $ VALCP SET RAME 101 /AUTO
-        $ WRITE SYS$OUTPUT "Rame 101 back in automatic. / Rame 101 rendue a l'automatique."
+        $ VALCP SET RAME 101 /AUTOMATIQUE
+        $ WRITE SYS$OUTPUT "Rame 101 rendue a l'automatique."
         $ EXIT
         """)
         seed(name: "TP2.COM", body: """
-        $ ! [TPKIT V2] TP2.COM -- EB-trip diagnosis down to the board
+        $ ! [TPKIT V3] TP2.COM -- EB-trip diagnosis down to the board
         $ !                      Diagnostic d'un declenchement FU jusqu'a la carte
-        $ ! One line of each command pair errors by language -- normal.
-        $ ! Une commande de chaque paire echoue selon la langue -- normal.
+        $ IF PCC$LANGUAGE .EQS. "FR" THEN GOTO FR
         $ WRITE SYS$OUTPUT "=== TP2: EB TRIP DIAGNOSIS (LRU) ==="
-        $ WRITE SYS$OUTPUT "=== TP2: DIAGNOSTIC D'UN DECLENCHEMENT FU (CARTE) ==="
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "A fault has just been injected on rame 102. Find it, name"
         $ WRITE SYS$OUTPUT "the suspect board, then restore service."
-        $ WRITE SYS$OUTPUT "Un defaut vient d'etre injecte sur la rame 102. Trouvez-le,"
-        $ WRITE SYS$OUTPUT "nommez la carte suspecte, puis retablissez le service."
         $ VALCP SET RAME 102 /SIGNAL=ON
-        $ VALCP SET RAME 102 /CTC=ON
         $ WAIT 00:00:02
         $ WRITE SYS$OUTPUT ""
-        $ WRITE SYS$OUTPUT "Procedure / Demarche :"
-        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             which point? / quel point ?"
-        $ WRITE SYS$OUTPUT "  2. VALCP SHOW RAME 102     program + EB cause / cause FU"
-        $ WRITE SYS$OUTPUT "  3. RUN LRU_LOOKUP          suspect board / carte suspecte"
-        $ WRITE SYS$OUTPUT "  4. Restore -- clear the fault (your language's spelling),"
-        $ WRITE SYS$OUTPUT "     release the EB at a stand, acknowledge:"
-        $ WRITE SYS$OUTPUT "     Retablir -- levez le defaut, FU relache a l'arret,"
-        $ WRITE SYS$OUTPUT "     acquittez :"
-        $ WRITE SYS$OUTPUT "       SET RAME 102 /SIGNAL=OFF   (EN)"
-        $ WRITE SYS$OUTPUT "       SET RAME 102 /CTC=OFF      (FR)"
-        $ WRITE SYS$OUTPUT "       START RAME 102"
-        $ WRITE SYS$OUTPUT "       ACKNOWLEDGE ALARM ALL"
+        $ WRITE SYS$OUTPUT "Procedure:"
+        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             which point?"
+        $ WRITE SYS$OUTPUT "  2. VALCP SHOW RAME 102     program + EB cause"
+        $ WRITE SYS$OUTPUT "  3. RUN LRU_LOOKUP          suspect board"
+        $ WRITE SYS$OUTPUT "  4. Restore: SET RAME 102 /SIGNAL=OFF, then START RAME 102,"
+        $ WRITE SYS$OUTPUT "     then ACKNOWLEDGE ALARM ALL."
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Self-check: the EB cause reads SF; the lookup names CPFS-A"
         $ WRITE SYS$OUTPUT "(vehicle) and the WCU AFSC/PP board."
+        $ EXIT
+        $FR:
+        $ WRITE SYS$OUTPUT "=== TP2: DIAGNOSTIC D'UN DECLENCHEMENT FU (CARTE) ==="
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Un defaut vient d'etre injecte sur la rame 102. Trouvez-le,"
+        $ WRITE SYS$OUTPUT "nommez la carte suspecte, puis retablissez le service."
+        $ VALCP SET RAME 102 /CTC=ON
+        $ WAIT 00:00:02
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Demarche :"
+        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             quel point ?"
+        $ WRITE SYS$OUTPUT "  2. VALCP SHOW RAME 102     programme + cause FU"
+        $ WRITE SYS$OUTPUT "  3. RUN LRU_LOOKUP          carte suspecte"
+        $ WRITE SYS$OUTPUT "  4. Retablir : SET RAME 102 /CTC=OFF, puis START RAME 102,"
+        $ WRITE SYS$OUTPUT "     puis ACKNOWLEDGE ALARM ALL."
+        $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Auto-verification : la cause FU indique SF ; la recherche"
         $ WRITE SYS$OUTPUT "nomme CPFS-A (vehicule) et la carte AFSC/PP du WCU."
         $ EXIT
         """)
         seed(name: "TP3.COM", body: """
-        $ ! [TPKIT V2] TP3.COM -- Adhesion and the anti-skid function
+        $ ! [TPKIT V3] TP3.COM -- Adhesion and the anti-skid function
         $ !                      Adherence et fonction anti-patinage
-        $ ! One line of each command pair errors by language -- normal.
-        $ ! Une commande de chaque paire echoue selon la langue -- normal.
+        $ IF PCC$LANGUAGE .EQS. "FR" THEN GOTO FR
         $ WRITE SYS$OUTPUT "=== TP3: ADHESION AND THE ANTI-SKID FUNCTION ==="
-        $ WRITE SYS$OUTPUT "=== TP3: ADHERENCE ET FONCTION ANTI-PATINAGE ==="
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Rame 103 now runs over a low-adhesion patch under traction."
-        $ WRITE SYS$OUTPUT "La rame 103 franchit desormais une zone glissante en traction."
         $ VALCP SET RAME 103 /SLIP=ON
-        $ VALCP SET RAME 103 /PATINAGE=ON
         $ WRITE SYS$OUTPUT ""
-        $ WRITE SYS$OUTPUT "Observe / Observez :"
+        $ WRITE SYS$OUTPUT "Observe:"
         $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             PATINAGE raises (advisory)."
         $ WRITE SYS$OUTPUT "  2. The affected car's effort is cancelled then ramped back:"
         $ WRITE SYS$OUTPUT "     the anti-skid trips on an 8 km/h motor-speed spread and"
         $ WRITE SYS$OUTPUT "     cannot act per wheel -- the differential forbids it."
-        $ WRITE SYS$OUTPUT "     L'effort de la voiture touchee est annule puis retabli en"
+        $ WRITE SYS$OUTPUT "  3. MONITOR DYNAMICS        speed vs setpoint under slip."
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Restore & acknowledge: SET RAME 103 /SLIP=OFF, then"
+        $ WRITE SYS$OUTPUT "ACKNOWLEDGE ALARM ALL."
+        $ EXIT
+        $FR:
+        $ WRITE SYS$OUTPUT "=== TP3: ADHERENCE ET FONCTION ANTI-PATINAGE ==="
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "La rame 103 franchit desormais une zone glissante en traction."
+        $ VALCP SET RAME 103 /PATINAGE=ON
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Observez :"
+        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             PATINAGE apparait (advisory)."
+        $ WRITE SYS$OUTPUT "  2. L'effort de la voiture touchee est annule puis retabli en"
         $ WRITE SYS$OUTPUT "     rampe : l'anti-patinage detecte un ecart moteur de 8 km/h"
         $ WRITE SYS$OUTPUT "     et ne peut agir par roue -- le differentiel l'interdit."
-        $ WRITE SYS$OUTPUT "  3. MONITOR DYNAMICS        speed vs consigne under slip."
-        $ WRITE SYS$OUTPUT "                             vitesse vs consigne en patinage."
+        $ WRITE SYS$OUTPUT "  3. MONITOR DYNAMICS        vitesse vs consigne en patinage."
         $ WRITE SYS$OUTPUT ""
-        $ WRITE SYS$OUTPUT "Restore & acknowledge / Retablissez et acquittez :"
-        $ WRITE SYS$OUTPUT "   SET RAME 103 /SLIP=OFF     (EN)"
-        $ WRITE SYS$OUTPUT "   SET RAME 103 /PATINAGE=OFF (FR)"
-        $ WRITE SYS$OUTPUT "   ACKNOWLEDGE ALARM ALL"
+        $ WRITE SYS$OUTPUT "Retablissez et acquittez : SET RAME 103 /PATINAGE=OFF, puis"
+        $ WRITE SYS$OUTPUT "ACKNOWLEDGE ALARM ALL."
         $ EXIT
         """)
         seed(name: "TP4.COM", body: """
-        $ ! [TPKIT V2] TP4.COM -- Programmed-stop (berthing) accuracy
+        $ ! [TPKIT V3] TP4.COM -- Programmed-stop (berthing) accuracy
         $ !                      Precision d'arret programme (accostage)
-        $ ! One line of each command pair errors by language -- normal.
-        $ ! Une commande de chaque paire echoue selon la langue -- normal.
+        $ IF PCC$LANGUAGE .EQS. "FR" THEN GOTO FR
         $ WRITE SYS$OUTPUT "=== TP4: PROGRAMMED-STOP ACCURACY ==="
-        $ WRITE SYS$OUTPUT "=== TP4: PRECISION D'ARRET PROGRAMME ==="
         $ SET LINE /SERVICE=ON
-        $ SET LIGNE /SERVICE=ON
         $ WRITE SYS$OUTPUT ""
-        $ WRITE SYS$OUTPUT "Platform stop markers / Points d'arret des quais :"
+        $ WRITE SYS$OUTPUT "Platform stop markers:"
         $ WRITE SYS$OUTPUT "   CHU-Eurasante 50.0   Gambetta 200.0   Flandres 350.0"
         $ WRITE SYS$OUTPUT "   Fives 550.0   Pont de Bois 700.0   4 Cantons 850.0"
         $ WRITE SYS$OUTPUT ""
-        $ WRITE SYS$OUTPUT "Procedure / Demarche :"
+        $ WRITE SYS$OUTPUT "Procedure:"
         $ WRITE SYS$OUTPUT "  1. SHOW RAMES              catch a rame at DWELL."
-        $ WRITE SYS$OUTPUT "                             attrapez une rame A QUAI."
         $ WRITE SYS$OUTPUT "  2. VALCP SHOW RAME <n>     read its Position."
-        $ WRITE SYS$OUTPUT "                             relevez sa position."
         $ WRITE SYS$OUTPUT "  3. Compare with the marker above. Repeat for 3 berths."
-        $ WRITE SYS$OUTPUT "     Comparez au point d'arret. Repetez sur 3 accostages."
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Self-check: every stop lands within 1.5 m of the marker"
-        $ WRITE SYS$OUTPUT "(the B3 loop aims 1.5 m short; the real system demonstrated"
-        $ WRITE SYS$OUTPUT "+/-0.30 m at the door sill -- DOT report, section 4.11)."
+        $ WRITE SYS$OUTPUT "(the real system demonstrated +/-0.30 m at the door sill --"
+        $ WRITE SYS$OUTPUT "DOT report, section 4.11)."
+        $ EXIT
+        $FR:
+        $ WRITE SYS$OUTPUT "=== TP4: PRECISION D'ARRET PROGRAMME ==="
+        $ SET LIGNE /SERVICE=ON
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Points d'arret des quais :"
+        $ WRITE SYS$OUTPUT "   CHU-Eurasante 50,0   Gambetta 200,0   Flandres 350,0"
+        $ WRITE SYS$OUTPUT "   Fives 550,0   Pont de Bois 700,0   4 Cantons 850,0"
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Demarche :"
+        $ WRITE SYS$OUTPUT "  1. SHOW RAMES              attrapez une rame A QUAI."
+        $ WRITE SYS$OUTPUT "  2. VALCP SHOW RAME <n>     relevez sa position."
+        $ WRITE SYS$OUTPUT "  3. Comparez au point d'arret. Repetez sur 3 accostages."
+        $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Auto-verification : chaque arret tombe a moins de 1,5 m du"
         $ WRITE SYS$OUTPUT "point (le systeme reel a demontre +/-0,30 m -- rapport DOT,"
         $ WRITE SYS$OUTPUT "section 4.11)."
         $ EXIT
         """)
         seed(name: "TP5.COM", body: """
-        $ ! [TPKIT V2] TP5.COM -- KACOP vigilance discipline
+        $ ! [TPKIT V3] TP5.COM -- KACOP vigilance discipline
         $ !                      Discipline de vigilance KACOP
-        $ ! One line of each command pair errors by language -- normal.
-        $ ! Une commande de chaque paire echoue selon la langue -- normal.
+        $ IF PCC$LANGUAGE .EQS. "FR" THEN GOTO FR
         $ WRITE SYS$OUTPUT "=== TP5: KACOP VIGILANCE DISCIPLINE ==="
-        $ WRITE SYS$OUTPUT "=== TP5: DISCIPLINE DE VIGILANCE KACOP ==="
-        $ VALCP SET RAME 101 /MANU
+        $ VALCP SET RAME 101 /MANUAL
         $ VALCP SET RAME 101 /SPEED=6
-        $ VALCP SET RAME 101 /VITESSE=6
         $ VALCP SET RAME 101 /KG=ON
         $ VALCP SET RAME 101 /REVERSER=AV
-        $ VALCP SET RAME 101 /INVERSEUR=AV
         $ VALCP SET RAME 101 /LEVER=40
-        $ VALCP SET RAME 101 /MANIPULATEUR=40
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Rame 101 is driving manually. Do NOT acknowledge, and watch:"
-        $ WRITE SYS$OUTPUT "La rame 101 roule en manuel. N'acquittez PAS, et observez :"
         $ WRITE SYS$OUTPUT "  1. At 14 s: VIGILANCE alarm + KACOP voyant (detail window)."
-        $ WRITE SYS$OUTPUT "     A 14 s : alarme VIGILANCE + voyant KACOP (fenetre detail)."
         $ WRITE SYS$OUTPUT "  2. At 20 s: the EB trips, cause KACOP."
-        $ WRITE SYS$OUTPUT "     A 20 s : declenchement FU, cause KACOP."
         $ WRITE SYS$OUTPUT "  3. At a stand, one acknowledgment releases it:"
-        $ WRITE SYS$OUTPUT "     A l'arret, un acquittement le relache :"
         $ WRITE SYS$OUTPUT "       SET RAME 101 /KACOP"
         $ WRITE SYS$OUTPUT "  4. Drive again, acknowledging inside 14 s this time."
-        $ WRITE SYS$OUTPUT "     Reprenez la marche en acquittant sous 14 s cette fois."
         $ WRITE SYS$OUTPUT ""
-        $ WRITE SYS$OUTPUT "Finish / Terminer :  @TP1_FIN"
+        $ WRITE SYS$OUTPUT "Finish:  @TP1_FIN"
+        $ EXIT
+        $FR:
+        $ WRITE SYS$OUTPUT "=== TP5: DISCIPLINE DE VIGILANCE KACOP ==="
+        $ VALCP SET RAME 101 /MANUEL
+        $ VALCP SET RAME 101 /VITESSE=6
+        $ VALCP SET RAME 101 /KG=ON
+        $ VALCP SET RAME 101 /INVERSEUR=AV
+        $ VALCP SET RAME 101 /MANIPULATEUR=40
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "La rame 101 roule en manuel. N'acquittez PAS, et observez :"
+        $ WRITE SYS$OUTPUT "  1. A 14 s : alarme VIGILANCE + voyant KACOP (fenetre detail)."
+        $ WRITE SYS$OUTPUT "  2. A 20 s : declenchement FU, cause KACOP."
+        $ WRITE SYS$OUTPUT "  3. A l'arret, un acquittement le relache :"
+        $ WRITE SYS$OUTPUT "       SET RAME 101 /KACOP"
+        $ WRITE SYS$OUTPUT "  4. Reprenez la marche en acquittant sous 14 s cette fois."
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Terminer :  @TP1_FIN"
         $ EXIT
         """)
         seed(name: "TP6.COM", body: """
-        $ ! [TPKIT V2] TP6.COM -- Tire-pressure triage
+        $ ! [TPKIT V3] TP6.COM -- Tire-pressure triage
         $ !                      Tri d'une degradation pneumatique
-        $ ! One line of each command pair errors by language -- normal.
-        $ ! Une commande de chaque paire echoue selon la langue -- normal.
+        $ IF PCC$LANGUAGE .EQS. "FR" THEN GOTO FR
         $ WRITE SYS$OUTPUT "=== TP6: TIRE-PRESSURE TRIAGE ==="
-        $ WRITE SYS$OUTPUT "=== TP6: TRI D'UNE DEGRADATION PNEUMATIQUE ==="
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Tire 3 of rame 101 is degrading (two steps: low pressure,"
         $ WRITE SYS$OUTPUT "then puncture)."
-        $ WRITE SYS$OUTPUT "Le pneu 3 de la rame 101 se degrade (deux crans : pression"
-        $ WRITE SYS$OUTPUT "basse, puis crevaison)."
         $ VALCP SET RAME 101 /TIRE=3
-        $ VALCP SET RAME 101 /PNEU=3
         $ WAIT 00:00:02
         $ VALCP SET RAME 101 /TIRE=3
-        $ VALCP SET RAME 101 /PNEU=3
         $ WRITE SYS$OUTPUT ""
-        $ WRITE SYS$OUTPUT "Procedure / Demarche :"
-        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             PNEU severity? / gravite PNEU ?"
-        $ WRITE SYS$OUTPUT "  2. RUN PNEU_CAL            find the position / la position."
+        $ WRITE SYS$OUTPUT "Procedure:"
+        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             PNEU severity?"
+        $ WRITE SYS$OUTPUT "  2. RUN PNEU_CAL            find the position."
         $ WRITE SYS$OUTPUT "  3. RUN LRU_LOOKUP          running-gear pointer."
-        $ WRITE SYS$OUTPUT "  4. DETAIL window: the tire gauges and the adhesion contact"
-        $ WRITE SYS$OUTPUT "     in the safety chain. / les manometres pneus et le"
-        $ WRITE SYS$OUTPUT "     contact adherence de la chaine de securite."
+        $ WRITE SYS$OUTPUT "  4. DETAIL window: tire gauges + the adhesion contact."
         $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Restore: cycle tire 3 twice more (through BURST -- watch the"
-        $ WRITE SYS$OUTPUT "severity climb to CRITICAL, then clear to OK) and acknowledge."
+        $ WRITE SYS$OUTPUT "severity climb to CRITICAL, then clear to OK), acknowledge:"
+        $ WRITE SYS$OUTPUT "   SET RAME 101 /TIRE=3"
+        $ WRITE SYS$OUTPUT "   SET RAME 101 /TIRE=3"
+        $ WRITE SYS$OUTPUT "   ACKNOWLEDGE ALARM ALL"
+        $ EXIT
+        $FR:
+        $ WRITE SYS$OUTPUT "=== TP6: TRI D'UNE DEGRADATION PNEUMATIQUE ==="
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Le pneu 3 de la rame 101 se degrade (deux crans : pression"
+        $ WRITE SYS$OUTPUT "basse, puis crevaison)."
+        $ VALCP SET RAME 101 /PNEU=3
+        $ WAIT 00:00:02
+        $ VALCP SET RAME 101 /PNEU=3
+        $ WRITE SYS$OUTPUT ""
+        $ WRITE SYS$OUTPUT "Demarche :"
+        $ WRITE SYS$OUTPUT "  1. SHOW ALARMS             gravite PNEU ?"
+        $ WRITE SYS$OUTPUT "  2. RUN PNEU_CAL            trouvez la position."
+        $ WRITE SYS$OUTPUT "  3. RUN LRU_LOOKUP          pointeur organes de roulement."
+        $ WRITE SYS$OUTPUT "  4. Fenetre DETAIL : manometres pneus + contact adherence."
+        $ WRITE SYS$OUTPUT ""
         $ WRITE SYS$OUTPUT "Retablir : cyclez encore deux fois le pneu 3 (en passant par"
-        $ WRITE SYS$OUTPUT "ECLATEMENT -- gravite CRITIQUE, puis retour OK) et acquittez."
-        $ WRITE SYS$OUTPUT "   SET RAME 101 /TIRE=3   (EN)   ou/or   SET RAME 101 /PNEU=3   (FR)"
+        $ WRITE SYS$OUTPUT "ECLATEMENT -- gravite CRITIQUE, puis retour OK), acquittez :"
+        $ WRITE SYS$OUTPUT "   SET RAME 101 /PNEU=3"
+        $ WRITE SYS$OUTPUT "   SET RAME 101 /PNEU=3"
         $ WRITE SYS$OUTPUT "   ACKNOWLEDGE ALARM ALL"
         $ EXIT
         """)
@@ -418,7 +465,7 @@ final class DCLScriptStore {
     /// Training-kit files carry a version tag; a copy WITHOUT the current
     /// tag is stale (or pre-dates the kit) and is replaced on launch.
     /// Operator edits that keep the tag line survive.
-    private func reseedKit(name: String, tag: String = "[TPKIT V2]") {
+    private func reseedKit(name: String, tag: String = "[TPKIT V3]") {
         let u = url(for: name)
         if let existing = try? String(contentsOf: u, encoding: .utf8),
            !existing.contains(tag) {

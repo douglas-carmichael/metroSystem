@@ -34,6 +34,7 @@ final class DCLEngine: ObservableObject {
         case monitor
         case testUtility(name: String, header: String)
         case diagnosticMenu
+        case lruBrowser
         case screenEditor
     }
     var liveMode: LiveMode = .none
@@ -62,6 +63,11 @@ final class DCLEngine: ObservableObject {
     }
     var diagMenuItems: [DiagMenuItem] = []
     var diagMenuSelection: Int = 0
+
+    // LRU directory browser state (RUN LRU_DIR) -- the simulated
+    // DECforms board-lookup form; see DCLLRUBrowser.swift.
+    var lruDirSelection: Int = 0
+    var lruDirFilter: String = ""
     /// True while a diagnostic test is running that was launched from the
     /// DIAGNOSE menu (versus a bare `RUN FREIN_TEST`). `stopMonitor` reads
     /// this to decide whether to drop to the DCL prompt or re-show the menu
@@ -436,6 +442,7 @@ final class DCLEngine: ObservableObject {
         s += "    " + tr("login.lpd.portes") + "\n"
         s += "    " + tr("login.lpd.pneu")   + "\n"
         s += "    " + tr("login.lpd.quai")   + "\n"
+        s += "    " + tr("login.lpd.lrudir") + "\n"
         s += "    " + tr("login.lpd.help") + "\n"
         return s
     }

@@ -291,6 +291,12 @@ final class MetroWorld: ObservableObject {
                     t.ebCause = "none"
                     if t.status == .emergency { t.status = .stopped }
                 }
+            // AVP redundancy (DOT §3.5.2.15): string selection and the
+            // comparison mode are remote exploitation commands.
+            case .avpSelect:
+                t.avpActiveString = (value ?? 0) > 0.5 ? "B" : "A"
+            case .avpVoting:
+                t.avpVotingAnd = (value ?? 1) > 0.5
             }
         }
     }

@@ -139,6 +139,16 @@ extension DCLEngine {
                         t.pupitreKG ? "ON" : "OFF", rev, t.pupitreLever * 100,
                         t.kacopSecondsSinceAck)
         }
+        // AVP redundancy: active/standby string health + voting mode.
+        if !t.speedProgram.isEmpty {
+            func health(_ fault: Bool) -> String {
+                fault ? tr("valcp.rame.avp.fault") : tr("valcp.rame.avp.ok")
+            }
+            s += String(format: tr("valcp.rame.avp") + "\n",
+                        t.avpActiveString,
+                        health(t.avpStringAFault), health(t.avpStringBFault),
+                        t.avpVotingAnd ? tr("valcp.rame.avp.and") : tr("valcp.rame.avp.or"))
+        }
         s += tr("valcp.rame.doors")     + tr(doorKey) + "\n"
         s += tr("valcp.rame.owner")     + tr(ownerKey) + "\n"
         s += String(format: tr("valcp.rame.pax") + "\n", t.passengerCount, Sim.paxCapacity)
@@ -221,6 +231,21 @@ extension DCLEngine {
         s += String(format: tr("valcp.ligne.geometry") + "\n", Sim.cantonCount, Int(Sim.trackLength))
         s += String(format: tr("valcp.ligne.rames"), world.locallyOwned().count, Sim.maxTrainCount)
         s += String(format: tr("valcp.ligne.remote"), world.trains.count - world.locallyOwned().count)
+        // Switch table (VAL backend only -- the aiguilles are its wayside
+        // equipment). Names are SCADA identifiers, positions localize.
+        if let backend = BackendManager.shared.engine as? VALSimBackend {
+            s += "\n" + tr("valcp.ligne.swheader")
+            s += tr("valcp.ligne.swsep")
+            for sw in backend.switchTable() {
+                let pos = sw.reversed ? tr("valcp.ligne.swpos.reverse")
+                                      : tr("valcp.ligne.swpos.normal")
+                let state = sw.locked ? tr("valcp.ligne.swlocked")
+                                      : tr("valcp.ligne.swmoving")
+                s += String(format: "    %2d  %-10@ %5.0f-%-5.0f  %-10@ %@\n",
+                            sw.id, sw.name as NSString, sw.entry, sw.exit,
+                            pos as NSString, state)
+            }
+        }
         return s
     }
 

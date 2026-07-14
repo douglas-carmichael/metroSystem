@@ -28,7 +28,8 @@ enum Strings {
         "alarm.msg.signalfault", "alarm.msg.patinage", "alarm.msg.enrayage",
         "alarm.msg.tirelow", "alarm.msg.tirepuncture", "alarm.msg.tireburst",
         "alarm.msg.paxfull", "alarm.msg.doorheld", "alarm.msg.kacop",
-        "alarm.msg.kibs",
+        "alarm.msg.kibs", "alarm.msg.route",
+        "alarm.msg.avpfault", "alarm.msg.avpdisc",
         "alarm.msg.controller", "alarm.msg.power", "alarm.msg.track",
         "alarm.msg.platform", "alarm.msg.display", "alarm.msg.switch",
         "alarm.msg.hwlink",
@@ -222,6 +223,8 @@ enum Strings {
                                 "  RUN QUAI_LAMP_TEST   Test des afficheurs et lampes de quai")
         add("login.lpd.lru",    "  RUN LRU_LOOKUP       Suspect-board lookup for latched faults (STS list)",
                                 "  RUN LRU_LOOKUP       Cartes suspectes pour les défauts mémorisés (liste STS)")
+        add("login.lpd.lrudir", "  RUN LRU_DIR          Interactive LRU directory (DECforms)",
+                                "  RUN LRU_DIR          Répertoire interactif des cartes LRU (DECforms)")
         add("login.lpd.help",   "Type HELP METRO for a worked example, HELP VALCP for the reference.",
                                 "Tapez HELP METRO pour un exemple, HELP VALCP pour la référence.")
 
@@ -335,6 +338,12 @@ enum Strings {
                                     "Vigilance KACOP dépassée -- acquitter sinon FU")
         add("alarm.msg.kibs",       "KIBS engaged: door safety loop inhibited (recovery move)",
                                     "KIBS enclenché : boucle de sécurité portes inhibée (secours)")
+        add("alarm.msg.route",      "Switch off the through route -- zone barred",
+                                    "Aiguille hors itinéraire direct -- zone interdite")
+        add("alarm.msg.avpfault",   "AVP safety string fault",
+                                    "Défaut chaîne de sécurité PA")
+        add("alarm.msg.avpdisc",    "AVP strings disagree -- running degraded on one string",
+                                    "Discordance chaînes PA -- marche dégradée sur une chaîne")
         add("alarm.msg.controller", "PCC controller watchdog fault -- all trains held",
                                     "Défaut chien de garde PCC -- toutes rames retenues")
         add("alarm.msg.hwlink",     "Model-track hardware link down while output armed",
@@ -406,6 +415,11 @@ enum Strings {
         add("detail.atp.program",   "Speed program",                       "Programme de vitesse")
         add("detail.atp.ebcause",   "EB cause",                            "Cause FU")
         add("detail.atp.lru",       "Suspect LRU",                         "Carte suspecte")
+        add("detail.atp.avp",       "PA STRINGS",                          "CHAÎNES PA")
+        add("detail.atp.avp.voting","COMPARISON",                          "COMPARAISON")
+        add("detail.atp.avp.and",   "AND (2/2)",                           "ET (2/2)")
+        add("detail.atp.avp.or",    "OR (1/2)",                            "OU (1/2)")
+        add("detail.atp.avp.inject","STRING FAULT (TEST)",                 "DÉFAUT CHAÎNE (TEST)")
         // Traction-chain bench rows (II / IL / IEX / MHI are the thesis
         // symbols -- identifiers, identical in both modes).
         add("detail.traction.armature","Armature current (II)",            "Courant d'induit (II)")
@@ -855,8 +869,28 @@ enum Strings {
                                     "%VALCP-S-SP, service provisoire levé -- ligne complète rétablie\n")
         add("valcp.ligne.spusage",  "%VALCP-W-IVSP, usage: SET LIGNE /SP=(from,to[,interval-s]) with station ids 1..6\n",
                                     "%VALCP-W-IVSP, usage : SET LIGNE /SP=(de,à[,intervalle-s]) avec des ids de station 1..6\n")
-        add("valcp.ligne.missqual", "%VALCP-W-MISSQUAL, expected /SERVICE=, /EMERGENCY=, /SP= or /NORMAL\n",
-                                    "%VALCP-W-MISSQUAL, attendu /SERVICE=, /EMERGENCY=, /SP= ou /NORMAL\n")
+        add("valcp.ligne.missqual", "%VALCP-W-MISSQUAL, expected /SERVICE=, /EMERGENCY=, /SP=, /SWITCH= or /NORMAL\n",
+                                    "%VALCP-W-MISSQUAL, attendu /SERVICE=, /URGENCE=, /SP=, /AIGUILLE= ou /NORMAL\n")
+        // Switch throws + SHOW LINE switch table (DOT §3.5.2.9). Switch
+        // names (AIG ...) are SCADA identifiers, language-neutral.
+        add("valcp.ligne.swusage",  "%VALCP-W-IVSWITCH, usage: SET LINE /SWITCH=(n,NORMAL|REVERSE)\n",
+                                    "%VALCP-W-IVSWITCH, usage : SET LIGNE /AIGUILLE=(n,NORMALE|DEVIEE)\n")
+        add("valcp.ligne.swok",     "%%VALCP-S-SWITCH, switch %d commanded to %@ -- points cycling (3 s lock-to-lock)\n",
+                                    "%%VALCP-S-SWITCH, aiguille %d commandée en position %@ -- manœuvre en cours (3 s)\n")
+        add("valcp.ligne.swocc",    "%%VALCP-W-SWZONEOCC, switch %d zone occupied -- throw refused (interlock)\n",
+                                    "%%VALCP-W-SWZONEOCC, zone de l'aiguille %d occupée -- manœuvre refusée (enclenchement)\n")
+        add("valcp.ligne.swnone",   "%%VALCP-W-NOSUCHSW, no such switch %d\n",
+                                    "%%VALCP-W-NOSUCHSW, aiguille %d inconnue\n")
+        add("valcp.ligne.swnoval",  "%VALCP-W-NOTVAL, switches are VAL wayside equipment -- the active backend has none\n",
+                                    "%VALCP-W-NOTVAL, les aiguilles relèvent du sol VAL -- le backend actif n'en a pas\n")
+        add("valcp.ligne.swheader", "     #  Switch      Zone (m)     Position    State\n",
+                                    "     #  Aiguille    Zone (m)     Position    État\n")
+        add("valcp.ligne.swsep",    "    --  ----------  -----------  ----------  ------------\n",
+                                    "    --  ----------  -----------  ----------  ------------\n")
+        add("valcp.ligne.swpos.normal",  "NORMAL",                        "NORMALE")
+        add("valcp.ligne.swpos.reverse", "REVERSE",                       "DÉVIÉE")
+        add("valcp.ligne.swlocked", "locked",                             "verrouillée")
+        add("valcp.ligne.swmoving", "IN MOTION",                          "EN MANŒUVRE")
 
         add("valcp.stations.title", "Stations of line 1 at %@",            "Stations de la ligne 1 à %@")
         add("valcp.stations.header","     #  Station                 Position    Next train\n",
@@ -937,6 +971,23 @@ enum Strings {
                                     "%%SET-S-PUPITRE, KIBS rame %@ %@ (inhibition boucle de sécurité)\n")
         add("valcp.rame.kph",       "%%SET-S-PUPITRE, train %@ headlights %@\n",
                                     "%%SET-S-PUPITRE, phares rame %@ %@\n")
+        // AVP redundancy (SET RAME /AVP /VOTING, faults /STRINGA /STRINGB).
+        add("valcp.rame.avp.string","%%SET-S-AVP, train %@ active PA string -> %@\n",
+                                    "%%SET-S-AVP, chaîne PA active de la rame %@ -> %@\n")
+        add("valcp.rame.avp.voting","%%SET-S-AVP, train %@ PA comparison -> %@\n",
+                                    "%%SET-S-AVP, comparaison PA de la rame %@ -> %@\n")
+        add("valcp.rame.avp.bad",   "%SET-W-IVKEYW, /AVP takes A or B; /VOTING takes AND or OR\n",
+                                    "%SET-W-IVKEYW, /PA accepte A ou B ; /VOTE accepte ET ou OU\n")
+        add("valcp.rame.fault.avpa","%%SET-S-FAULT, train %@ PA string A fault %@\n",
+                                    "%%SET-S-FAULT, défaut chaîne PA A rame %@ %@\n")
+        add("valcp.rame.fault.avpb","%%SET-S-FAULT, train %@ PA string B fault %@\n",
+                                    "%%SET-S-FAULT, défaut chaîne PA B rame %@ %@\n")
+        add("valcp.rame.avp",       "  PA strings:     active %@   A %@   B %@   voting %@",
+                                    "  Chaînes PA :    active %@   A %@   B %@   vote %@")
+        add("valcp.rame.avp.ok",    "OK",                                  "OK")
+        add("valcp.rame.avp.fault", "FAULT",                               "DÉFAUT")
+        add("valcp.rame.avp.and",   "AND (2/2)",                           "ET (2/2)")
+        add("valcp.rame.avp.or",    "OR (1/2)",                            "OU (1/2)")
         // VALCP SHOW RAME rows (VAL fixed-block telemetry).
         add("valcp.rame.program",   "  Speed program:  ",                  "  Programme :     ")
         add("valcp.rame.ebcause",   "EB cause:",                           "cause FU :")
@@ -948,8 +999,8 @@ enum Strings {
                                     "%%SET-W-IVPNEU, l'index du pneu doit être 1..%d\n")
         add("valcp.rame.pneu.cycled","%%SET-S-PNEU, train %@ tire %d now %@\n",
                                     "%%SET-S-PNEU, pneu %2$d de la rame %1$@ : %3$@\n")
-        add("valcp.rame.missqual",  "%SET-W-MISSQUAL, expected /MANUAL /AUTOMATIC /SPEED= /FU= /PORTES= /TRACTION= /FREIN= /CTC= /PATINAGE= /ENRAYAGE= or /PNEU=\n",
-                                    "%SET-W-MISSQUAL, attendu /MANUAL /AUTOMATIC /SPEED= /FU= /PORTES= /TRACTION= /FREIN= /CTC= /PATINAGE= /ENRAYAGE= ou /PNEU=\n")
+        add("valcp.rame.missqual",  "%SET-W-MISSQUAL, expected /MANUAL /AUTOMATIC /SPEED= /EB=, a pupitre switch (/KG /REVERSER /LEVER /KACOP /KIBS /KPH), /AVP= /VOTING=, a fault (/DOOR /ENGINE /BRAKE /SIGNAL /SLIP /SLIDE /STRINGA /STRINGB) or /TIRE=\n",
+                                    "%SET-W-MISSQUAL, attendu /MANUEL /AUTOMATIQUE /VITESSE= /FU=, un commutateur pupitre (/KG /INVERSEUR /MANIPULATEUR /KACOP /KIBS /KPH), /PA= /VOTE=, un défaut (/PORTES /TRACTION /FREIN /CTC /PATINAGE /ENRAYAGE /CHAINEA /CHAINEB) ou /PNEU=\n")
 
         // Diagnostics (LPD-DIAG).
         add("diag.suite",           "VAL-CTRL DIAGNOSTIC SUITE (LPD-DIAG)", "SUITE DE DIAGNOSTIC VAL-CTRL (LPD-DIAG)")
@@ -987,6 +1038,71 @@ enum Strings {
         add("diag.lru.clean",       "no latched fault",                    "aucun défaut mémorisé")
         add("diag.lru.scan",        "fault scan",                          "balayage des défauts")
         add("diag.step.lru.reference","Parts-list reference",              "Référence liste de pièces")
+
+        // LRU directory browser (RUN LRU_DIR) -- the simulated DECforms
+        // board catalogue. Board codes, rack names and trip mnemonics are
+        // identifiers; everything else localizes. Field labels are
+        // pre-padded so the record values align per language.
+        add("lru.title",            "VAL LRU DIRECTORY",                   "RÉPERTOIRE LRU VAL")
+        add("lru.col.header",       "BOARD      RACK",                     "CARTE      BAIE")
+        add("lru.field.board",      "Board:     ",                         "Carte :     ")
+        add("lru.field.rack",       "Rack:      ",                         "Baie :      ")
+        add("lru.field.function",   "Function:  ",                         "Fonction :  ")
+        add("lru.field.trips",      "FU trips:  ",                         "Décl. FU :  ")
+        add("lru.field.ref",        "Ref:       ",                         "Réf. :      ")
+        add("lru.find",             "Find:",                               "Rechercher :")
+        add("lru.count",            "%d boards",                           "%d cartes")
+        add("lru.count.one",        "1 board",                             "1 carte")
+        add("lru.nav",              "↑/↓ select · type to find · DEL erase · CTRL/Z or ESC ESC exit",
+                                    "↑/↓ sélection · tapez pour rechercher · SUPPR efface · CTRL/Z ou ESC ESC quitte")
+        add("lru.nomatch",          "No board matches the find field.",
+                                    "Aucune carte ne correspond à la recherche.")
+        add("lru.fn.cpfs",          "Safe-frequency detection: proves the f1/f2/f3 SF carrier and the f4/f5 direction bits; a lost or wrong carrier opens the FU loop.",
+                                    "Détection des fréquences de sécurité : contrôle la porteuse SF f1/f2/f3 et les bits de sens f4/f5 ; porteuse absente ou fausse = ouverture de la boucle FU.")
+        add("lru.fn.ssv",           "Overspeed detection: times the transmission-line crossovers; an interval under 0.27 s where the program commands 0.30 s trips the FU.",
+                                    "Détection de survitesse : mesure l'intervalle entre croisements de la ligne de transmission ; sous 0,27 s pour un programme à 0,30 s, déclenchement FU.")
+        add("lru.fn.cppp",          "Perturbed-program control: enforces the decreasing PP profile toward the stop point ahead of an occupied block and trips on overrun.",
+                                    "Contrôle du programme perturbé : impose le profil décroissant PP vers le point d'arrêt en amont d'un canton occupé et déclenche en cas de dépassement.")
+        add("lru.fn.sfu",           "FU interface: drives the emergency-brake loop (spring-applied disc brakes); every safety-rack trip and PCC FU order lands here.",
+                                    "Interface FU : commande la boucle du freinage d'urgence (freins à ressort) ; tout déclenchement du châssis de sécurité ou ordre FU du PCC aboutit ici.")
+        add("lru.fn.cmpab",         "PA(A)/PA(B) comparison: selects the active safety string and votes the two in AND (stop on disagreement) or OR (run on the survivor).",
+                                    "Comparaison PA(A)/PA(B) : sélectionne la chaîne de sécurité active et vote ET (arrêt sur discordance) ou OU (marche sur la chaîne survivante).")
+        add("lru.fn.mp68k3",        "Drive-rack microprocessor (68000 family): computes the speed command from the crossover-encoded program and runs the B1/B2/B3 stopping sequence.",
+                                    "Microprocesseur du châssis de conduite (famille 68000) : calcule la consigne depuis le programme codé par croisements et exécute la séquence d'arrêt B1/B2/B3.")
+        add("lru.fn.rega",          "Analog regulation loop: chases the consigne within the comfort limits (1.3 m/s2, 0.65 m/s3) and shapes the traction/brake demand.",
+                                    "Boucle de régulation analogique : poursuit la consigne dans les limites de confort (1,3 m/s2, 0,65 m/s3) et élabore la demande traction/freinage.")
+        add("lru.fn.assta",         "Asservissement interface: converts the regulation demand into chopper and brake commands for the HR car.",
+                                    "Interface d'asservissement : convertit la demande de régulation en commandes hacheur et frein pour la voiture HR.")
+        add("lru.fn.ilte",          "Door control interface: drives the door operators and proves the door train line closed and locked to the safety rack.",
+                                    "Interface de commande portes : pilote les opérateurs de portes et prouve à la chaîne de sécurité la ligne de train portes fermée et verrouillée.")
+        add("lru.fn.apep",          "Electro-pneumatic brake interface: blends friction with electric braking and meters the proportional valve (PEPD).",
+                                    "Interface électropneumatique de freinage : réalise le mixage frein électrique/friction et dose la valve proportionnelle (PEPD).")
+        add("lru.fn.essct",         "Traction safety contactor: opens the motoring circuit on demand of the safety rack; braking stays available.",
+                                    "Contacteur de sécurité traction : ouvre le circuit de traction à la demande du châssis de sécurité ; le freinage reste disponible.")
+        add("lru.fn.chopper",       "GTO armature chopper (300 Hz): meters the current of the car's two series-wired DC motors.",
+                                    "Hacheur d'induit à GTO (300 Hz) : dose le courant des deux moteurs CC série de la voiture.")
+        add("lru.fn.excitation",    "Image-serie excitation module: slaves the field to the armature current (0.059 ii full field, 0.034 ii weakened at the 750 V ceiling).",
+                                    "Module d'excitation image série : asservit l'excitation au courant d'induit (0,059 ii plein champ, 0,034 ii défluxé au plafond 750 V).")
+        add("lru.fn.cvs",           "Static converter: 112 V DC low-voltage bus from the 750 V line (battery-backed).",
+                                    "Convertisseur statique : bus basse tension 112 V CC depuis la ligne 750 V (secouru batterie).")
+        add("lru.fn.a22",           "Manual-driving console: KG master power, AV/0/AR reverser, T/F lever, KACOP dead-man, KIBS safety-loop inhibition, KPH headlights.",
+                                    "Pupitre de conduite manuelle : KG, inverseur AV/0/AR, manipulateur T/F, homme-mort KACOP, inhibition boucle de sécurité KIBS, phares KPH.")
+        add("lru.fn.intusa",        "Check-in/check-out presence detection: fail-safe block occupancy from the downlink presence signal, including the train's tail.",
+                                    "Détection de présence par pointage entrée/sortie : occupation des cantons en sécurité intrinsèque depuis le signal de présence descendant, queue de rame comprise.")
+        add("lru.fn.dcis",          "Detection interface: conditions the occupancy picture for program selection and reports it to Central.",
+                                    "Interface de détection : met en forme l'image d'occupation pour la sélection de programme et la remonte au PCC.")
+        add("lru.fn.afsc",          "Safe-frequency program selection: energizes the normal SF or perturbed PP program per section and withdraws the carrier on emergency.",
+                                    "Sélection du programme de fréquences de sécurité : alimente le programme SF normal ou PP perturbé par section et retire la porteuse en urgence.")
+        add("lru.fn.ckdo2",         "Switch-zone control: proves the points locked on the through route, encodes the 25 km/h zone program and bars the zone otherwise.",
+                                    "Contrôle de zone d'aiguille : prouve l'aiguille verrouillée en itinéraire direct, code le programme de zone 25 km/h et interdit la zone sinon.")
+        add("lru.fn.intrel",        "Relay interface: drives the switch motors and other trackside actuators under the interlocking's authority.",
+                                    "Interface relais : commande les moteurs d'aiguille et les autres actionneurs de voie sous l'autorité de l'enclenchement.")
+        add("lru.fn.dtu",           "Data transmission unit: the wayside end of the PCC data link (orders down, status and alarms up).",
+                                    "Unité de transmission de données : côté sol de la liaison PCC (ordres descendants, états et alarmes montants).")
+        add("lru.fn.wccu",          "Wayside central control unit: per-station controller hosting detection, program selection and the PCC link.",
+                                    "Unité centrale de contrôle au sol : contrôleur de station hébergeant détection, sélection de programme et liaison PCC.")
+        add("lru.fn.docu",          "Dwell operation control unit: runs the SFa/SFb station sequence, withholds departure (doors, downstream block, headway) and orders the turnback.",
+                                    "Unité de contrôle des opérations en station : séquence SFa/SFb, retient le départ (portes, canton aval, intervalle) et ordonne le retournement.")
         add("diag.step.frein.rame", "brake chain",                         "chaîne de freinage")
         add("diag.step.frein.fw",   "Brake controller firmware",           "Micrologiciel du contrôleur de frein")
         add("diag.step.portes.cycle","door cycle",                         "cycle des portes")

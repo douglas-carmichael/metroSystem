@@ -253,6 +253,7 @@ extension DCLEngine {
             "SHOW SYSTEM/PAGE",
             "SHOW LOGICAL", "SHOW LOGICAL/PROCESS",
             "SHOW SYMBOL", "SHOW SYMBOL $STATUS", "SHOW SYMBOL $SEVERITY",
+            "SHOW SYMBOL PCC$LANGUAGE",
             "SHOW ERROR", "SHOW STATUS", "SHOW LICENSE",
             "SHOW CPU", "SHOW DEFAULT", "SHOW QUOTA",
             "SHOW PROTECTION", "SHOW TERMINAL", "SHOW WORKING_SET",
@@ -266,7 +267,10 @@ extension DCLEngine {
             "SET STANDARD IEEE", "SET STANDARD EN62290", "SET STANDARD AUTO",
             "SET RAME 101 /MANUAL", "SET RAME 101 /AUTOMATIC",
             "SET RAME 101 /BRAKE=ON", "SET RAME 101 /TIRE=3",
+            "SET RAME 101 /AVP=A", "SET RAME 101 /VOTING=AND",
+            "SET RAME 101 /STRINGA=OFF",
             "SET LINE /SERVICE=ON", "SET LINE /EMERGENCY=OFF",
+            "SET LINE /SWITCH=(1,NORMAL)",
             "SHOW HARDWARE", "SET HARDWARE",
             "SET HARDWARE /DRIVER=CONSOLE", "SET HARDWARE /DISABLE",
             "SHOW BACKEND", "SHOW PRATIC",
@@ -291,6 +295,7 @@ extension DCLEngine {
             "EDIT FILE.TXT", "DIFFERENCES A.TXT B.TXT",
             "RUN PROG.EXE", "RUN FREIN_TEST", "RUN PORTES_TEST",
             "RUN PNEU_CAL", "RUN QUAI_LAMP_TEST", "RUN LRU_LOOKUP",
+            "RUN LRU_DIR",
             "ANALYZE/ERROR_LOG", "ANALYZE/AUDIT", "ANALYZE/IMAGE",
             "INITIALIZE DKA0:",
             "MOUNT DKA0:", "MOUNT MUA0: METRO_BACKUP",
@@ -360,6 +365,10 @@ extension DCLEngine {
                 t.pupitreKG = before.pupitreKG
                 t.pupitreReverser = before.pupitreReverser
                 t.pupitreLever = before.pupitreLever
+                t.avpActiveString = before.avpActiveString
+                t.avpVotingAnd = before.avpVotingAnd
+                t.avpStringAFault = before.avpStringAFault
+                t.avpStringBFault = before.avpStringBFault
             }
             if world.isRunning != lineWasRunning {
                 lineWasRunning ? world.startService() : world.stopService()

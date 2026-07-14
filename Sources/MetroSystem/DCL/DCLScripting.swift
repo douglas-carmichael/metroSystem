@@ -571,6 +571,9 @@ extension DCLEngine {
             return out
         case "TIME":
             return stamp(Date())
+        case "LANGUAGE":
+            // Lexical twin of the PCC$LANGUAGE builtin symbol.
+            return uiLang == .fr ? "FR" : "EN"
         case "USER":
             return username
         case "MODE":

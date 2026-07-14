@@ -516,6 +516,7 @@ private struct ATPSection: View {
     let train: Train
     @EnvironmentObject var language: AppLanguage
     @EnvironmentObject var world: MetroWorld
+    @EnvironmentObject var network: PeerNetwork
     var body: some View {
         let chain = world.safetyChain(for: train)
         return BoxPanel(title: language.t("detail.sec.atp"),
@@ -549,10 +550,75 @@ private struct ATPSection: View {
                                      color: RetroTheme.cyan)
                         }
                     }
+                    HRule(RetroTheme.amberDim)
+                    avpBlock
                 }
             }
             .frame(maxWidth: .infinity)
         }
+    }
+
+    /// AVP redundancy (DOT §3.5.2.15): the A/B strings with their health,
+    /// the active-string selector and the AND/OR comparison mode. String
+    /// selection and voting route like exploitation commands; the fault
+    /// chips inject only on locally-owned rames (like the other faults).
+    private var avpBlock: some View {
+        let isLocal = world.canControl(train)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(language.t("detail.atp.avp"))
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(RetroTheme.amber)
+                Spacer()
+                stringChip("A")
+                stringChip("B")
+            }
+            HStack {
+                Text(language.t("detail.atp.avp.voting"))
+                    .font(RetroTheme.monoSm)
+                    .foregroundColor(RetroTheme.amber)
+                Spacer()
+                RetroButton(train.avpVotingAnd
+                            ? language.t("detail.atp.avp.and")
+                            : language.t("detail.atp.avp.or")) {
+                    _ = network.control(train, .avpVoting,
+                                        value: train.avpVotingAnd ? 0 : 1)
+                }
+            }
+            if isLocal {
+                HStack {
+                    Text(language.t("detail.atp.avp.inject"))
+                        .font(RetroTheme.monoSm)
+                        .foregroundColor(RetroTheme.amberDim)
+                    Spacer()
+                    RetroButton("A", highlighted: train.avpStringAFault) {
+                        world.mutate(train.id) { $0.avpStringAFault.toggle() }
+                    }
+                    RetroButton("B", highlighted: train.avpStringBFault) {
+                        world.mutate(train.id) { $0.avpStringBFault.toggle() }
+                    }
+                }
+            }
+        }
+    }
+
+    /// One PA string chip: label + health colour; the active string is
+    /// marked and boxed. Tapping selects it (routed to the owner).
+    private func stringChip(_ name: String) -> some View {
+        let fault = name == "A" ? train.avpStringAFault : train.avpStringBFault
+        let active = train.avpActiveString == name
+        return Button {
+            _ = network.control(train, .avpSelect, value: name == "B" ? 1 : 0)
+        } label: {
+            Text(active ? "\(name)*" : name)
+                .font(RetroTheme.monoSm)
+                .foregroundColor(fault ? .red : (active ? RetroTheme.green : RetroTheme.amberDim))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .overlay(Rectangle().stroke(active ? RetroTheme.green : RetroTheme.amberDim,
+                                            lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     // A safety contact reads healthy=green closed square, faulted=red open.

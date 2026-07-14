@@ -48,6 +48,9 @@ enum TrainCommandKind: String, Codable {
     case pupitreKIBS
     case pupitreKPH
     case kacopAck
+    // AVP redundancy (string selection / comparison mode).
+    case avpSelect
+    case avpVoting
 }
 
 /// Mirror of the app's `TrainCommand`.

@@ -166,6 +166,10 @@ final class RameSimulator {
                 trains[index].ebCause = VALTripCause.none.rawValue
                 if trains[index].status == .emergency { trains[index].status = .stopped }
             }
+        case .avpSelect:
+            trains[index].avpActiveString = (cmd.value ?? 0) > 0.5 ? "B" : "A"
+        case .avpVoting:
+            trains[index].avpVotingAnd = (cmd.value ?? 1) > 0.5
         }
     }
 
@@ -375,8 +379,14 @@ final class RameSimulator {
                               tg: Telegram, dt: Double) {
         // Condition-driven FU (fault flags can only arrive via the wire
         // for daemon rames, but the mirror keeps the same order).
+        let activeStringFault = train.avpActiveString == "B"
+            ? train.avpStringBFault : train.avpStringAFault
+        let standbyStringFault = train.avpActiveString == "B"
+            ? train.avpStringAFault : train.avpStringBFault
         var cause: VALTripCause = .none
         if train.isSignalFault { cause = .sfLoss }
+        else if activeStringFault { cause = .avpString }
+        else if standbyStringFault && train.avpVotingAnd { cause = .avpDiscrepancy }
         else if train.isDoorFault { cause = .doorFault }
         else if train.isBrakeFault { cause = .brakeFault }
         else if train.doorsOpen && train.speed > 0.5
@@ -487,6 +497,24 @@ final class RameSimulator {
             let d = distanceAhead(from: train.position, to: boundary, direction: train.travelDirection)
             let curve = (tg.nextBlockCode * tg.nextBlockCode + 2 * Sim.nominalBraking * max(0, d - lead)).squareRoot()
             v = min(v, curve)
+        }
+        // Switch-zone 25 km/h program (points always locked normal on a
+        // daemon node -- only the speed profile applies, mirror of the
+        // app's zone handling).
+        for z in Sim.switchZones {
+            let entryPoint = train.travelDirection == .forward ? z.entry : z.exit
+            let exitPoint  = train.travelDirection == .forward ? z.exit  : z.entry
+            let dEntry = distanceAhead(from: train.position, to: entryPoint,
+                                       direction: train.travelDirection)
+            let dExit = distanceAhead(from: train.position, to: exitPoint,
+                                      direction: train.travelDirection)
+            if dExit < dEntry {
+                v = min(v, Sim.switchZoneSpeed)
+            } else if dEntry < 250 {
+                let curve = (Sim.switchZoneSpeed * Sim.switchZoneSpeed
+                             + 2 * Sim.nominalBraking * max(0, dEntry - lead)).squareRoot()
+                v = min(v, curve)
+            }
         }
         if includeStops, let anchor = tg.stopAnchor {
             var d = distanceAhead(from: train.position, to: anchor, direction: train.travelDirection)

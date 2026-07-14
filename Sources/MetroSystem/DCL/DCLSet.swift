@@ -113,6 +113,40 @@ extension DCLEngine {
                           world.stationName(id: toId),
                           Int(max(10, interval)))
         }
+        // Switch throws (DOT §3.5.2.9): /SWITCH=(n,NORMAL|REVERSE), FR
+        // /AIGUILLE=(n,NORMALE|DEVIEE). The wayside interlock refuses a
+        // throw while any vehicle occupies the zone; the points cycle
+        // lock-to-lock for 3 s (zone barred meanwhile).
+        if let spec = cmd.qualifierValue(locQual(en: "SWITCH", fr: "AIGUILLE"), min: 3) {
+            let cleaned = spec.trimmingCharacters(in: CharacterSet(charactersIn: "()"))
+            let parts = cleaned.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces).uppercased() }
+            guard parts.count == 2, let id = Int(parts[0]) else {
+                return tr("valcp.ligne.swusage")
+            }
+            let reversed: Bool
+            switch parts[1] {
+            case "NORMAL", "NORMALE", "N":            reversed = false
+            case "REVERSE", "DEVIEE", "DÉVIÉE", "R", "D": reversed = true
+            default:
+                return tr("valcp.ligne.swusage")
+            }
+            guard let backend = BackendManager.shared.engine as? VALSimBackend else {
+                return tr("valcp.ligne.swnoval")
+            }
+            let posName = reversed ? tr("valcp.ligne.swpos.reverse")
+                                   : tr("valcp.ligne.swpos.normal")
+            switch backend.throwSwitch(id: id, reversed: reversed) {
+            case .ok:
+                return String(format: tr("valcp.ligne.swok"), id, posName)
+            case .zoneOccupied:
+                fail("SET-W-SWZONEOCC", "%X000080B2")
+                return String(format: tr("valcp.ligne.swocc"), id)
+            case .noSuchSwitch:
+                fail("SET-W-NOSUCHSW", "%X000080B3")
+                return String(format: tr("valcp.ligne.swnone"), id)
+            }
+        }
         return tr("valcp.ligne.missqual")
     }
 
@@ -311,6 +345,31 @@ extension DCLEngine {
                 String(format: tr("valcp.rame.kph"), dLabel,
                        on ? tr("valcp.rame.pupitre.on") : tr("valcp.rame.pupitre.off")))
         }
+        // AVP redundancy (DOT §3.5.2.15): string selection and the
+        // comparison mode are remote exploitation commands. FR keeps the
+        // French name of the equipment (PA, pilote automatique).
+        if let avp = cmd.qualifierValue(locQual(en: "AVP", fr: "PA"), min: 2) {
+            switch avp.uppercased() {
+            case "A", "B":
+                let toB = avp.uppercased() == "B"
+                return routed(.avpSelect, value: toB ? 1 : 0, localText:
+                    String(format: tr("valcp.rame.avp.string"), dLabel, toB ? "B" : "A"))
+            default:
+                return tr("valcp.rame.avp.bad")
+            }
+        }
+        if let vote = cmd.qualifierValue(locQual(en: "VOTING", fr: "VOTE"), min: 4) {
+            switch vote.uppercased() {
+            case "AND", "ET":
+                return routed(.avpVoting, value: 1, localText:
+                    String(format: tr("valcp.rame.avp.voting"), dLabel, tr("valcp.rame.avp.and")))
+            case "OR", "OU":
+                return routed(.avpVoting, value: 0, localText:
+                    String(format: tr("valcp.rame.avp.voting"), dLabel, tr("valcp.rame.avp.or")))
+            default:
+                return tr("valcp.rame.avp.bad")
+            }
+        }
         // Latched fault points and tires model the owning node's physical
         // rolling stock -- owner-only by design (no wire command exists).
         guard isLocal else {
@@ -325,6 +384,8 @@ extension DCLEngine {
             ("CTC",      "SIGNAL", { $0.isSignalFault = $1 }, "valcp.rame.fault.ctc"),
             ("PATINAGE", "SLIP",   { $0.isPatinage = $1 },    "valcp.rame.fault.patinage"),
             ("ENRAYAGE", "SLIDE",  { $0.isEnrayage = $1 },    "valcp.rame.fault.enrayage"),
+            ("CHAINEA",  "STRINGA", { $0.avpStringAFault = $1 }, "valcp.rame.fault.avpa"),
+            ("CHAINEB",  "STRINGB", { $0.avpStringBFault = $1 }, "valcp.rame.fault.avpb"),
         ]
         for entry in faultMap {
             let name = locQual(en: entry.en, fr: entry.fr)

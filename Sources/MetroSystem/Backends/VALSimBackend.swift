@@ -54,6 +54,22 @@ final class VALSimBackend: MetroBackendEngine {
         self.world = world
     }
 
+    // MARK: -- wayside operator surface (switches)
+
+    /// Operator throw from the PCC (DCL SET LINE /SWITCH). Interlocked:
+    /// refused while any vehicle occupies the zone.
+    func throwSwitch(id: Int, reversed: Bool) -> VALWayside.SwitchThrowResult {
+        guard let world else { return .noSuchSwitch }
+        return wayside.throwSwitch(id: id, reversed: reversed,
+                                   trains: world.trains, now: Date())
+    }
+
+    /// Switch table snapshot for SHOW LINE.
+    func switchTable() -> [(id: Int, name: String, entry: Double, exit: Double,
+                            reversed: Bool, locked: Bool)] {
+        wayside.switchTable(now: Date())
+    }
+
     func start() {
         guard timer == nil else { return }
         lastTickAt = Date()
@@ -184,6 +200,13 @@ final class VALSimBackend: MetroBackendEngine {
         case .normal, .stopped:
             world.clearAlarm(source: "SYS", point: "SAFETY_MODE")
         }
+
+        // Switch routes: a switch off the through route (or cycling) bars
+        // its zone -- standing minor alarm until the route is restored.
+        for sw in wayside.switchTable(now: Date()) {
+            let barred = sw.reversed || !sw.locked
+            sample(world, sw.name, "ROUTE", barred, .minor, "alarm.msg.route")
+        }
     }
 
     private func sampleTrainAlarms(world: MetroWorld, at now: Date) {
@@ -224,6 +247,14 @@ final class VALSimBackend: MetroBackendEngine {
             // KIBS engaged: a vital loop is inhibited -- standing alarm
             // for as long as the bypass is in (ISA-18.2: bypasses alarm).
             sample(world, source, "KIBS", train.pupitreKIBS, .major, "alarm.msg.kibs")
+            // AVP string health (DOT §3.5.2.15): each string alarms while
+            // faulted; running degraded on one string under OR voting is
+            // the discrepancy warning of §4.5.10.
+            sample(world, source, "AVP_A", train.avpStringAFault, .major, "alarm.msg.avpfault")
+            sample(world, source, "AVP_B", train.avpStringBFault, .major, "alarm.msg.avpfault")
+            sample(world, source, "AVP_DISC",
+                   train.avpStringAFault != train.avpStringBFault,
+                   .minor, "alarm.msg.avpdisc")
 
             switch train.worstTire {
             case .ok:

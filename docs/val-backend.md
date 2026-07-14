@@ -188,27 +188,84 @@ headers use the neutral LIMIT/LIMITE).
   board(s) in the STS parts-list nomenclature — the board-swap
   maintenance model of the O'Hare contract. The detail window's ATP
   section shows the same suspect line while an FU is in.
+- **LRU directory** (`RUN LRU_DIR`, also on the DIAGNOSE menu and the
+  login splash): an interactive full-screen board catalogue presented
+  as a simulated DECforms application — the OBCU SAFETY/DRIVE racks,
+  traction chain, console A22, wayside WCU and station DOCU boards,
+  each with its function, the FU trip mnemonics it explains and the
+  source reference. Arrow keys browse, typing filters live
+  (`DCLLRUBrowser.swift`).
 - **Self-paced exercises** `TP1..TP6.COM` seeded in the COM store
   (`@TP1` — bench reading; `@TP2` — EB-trip diagnosis to the board;
   `@TP3` — adhesion/anti-skid; `@TP4` — programmed-stop accuracy
   against the DOT §4.11 figures; `@TP5` — KACOP vigilance discipline;
   `@TP6` — tire-pressure triage). Each sets up its own scenario, prints
   bilingual instructions and the expected observations for self-check,
-  and never needs an instructor station or a second node. Because the
-  SET RAME qualifiers follow the interface language, the scripts issue
-  gated commands in both spellings — one of each pair reports a benign
-  qualifier error, which the scripts explain. The detail window's
-  TRACTION BENCH strip (II / signed IL / IEX / MHI meters) is the
-  visual companion to TP1.
+  and never needs an instructor station or a second node. The scripts
+  branch on the read-only symbol `PCC$LANGUAGE` (`"EN"`/`"FR"`, also
+  `F$LANGUAGE()`) into a full English or full French block, so each run
+  is single-language and every language-gated qualifier is issued in
+  the operator's spelling ([TPKIT V3]). The detail window's TRACTION
+  BENCH strip (II / signed IL / IEX / MHI meters) is the visual
+  companion to TP1.
+
+## Switch zones (DOT §3.5.2.9)
+
+Three switch zones overlay the loop (`Sim.switchZones`): the crossovers
+behind CHU (blocks 0/1) and 4 Cantons (blocks 8/9) and the depot access
+in interstation block 4 — each ~24 m around the points. The wayside
+(`VALWayside.switches`) treats NORMAL as the through route:
+
+- The zone geometry always encodes a **25 km/h program**
+  (`Sim.switchZoneSpeed`): approaching rames taper onto it like any
+  code drop, and the AVP ceiling follows (a rame through the points
+  above ~28 km/h trips SURVITESSE).
+- A throw (`SET LINE /SWITCH=(n,NORMAL|REVERSE)`, FR
+  `/AIGUILLE=(n,NORMALE|DEVIEE)`) cycles the points **3 s
+  lock-to-lock** (`Sim.switchThrowTime`). While in motion, or locked
+  REVERSE, the zone is **barred**: the WCU commands a perturbed stop
+  8 m before the points and being inside the zone trips the FU
+  (`VALTripCause.switchZone`, mnemonic AIGUILLE, suspect boards
+  CKDO2/INTREL). Recovery is the KIBS creep-out: `/MANUAL` + `/KIBS`,
+  release the FU, drive clear at ≤3 m/s.
+- The **interlock refuses a throw while any rame occupies the zone**
+  (`%VALCP-W-SWZONEOCC`), and each barred switch holds an `AIG n/ROUTE`
+  minor alarm until the through route is restored.
+- Under SP, a turnback at a terminus with an adjacent crossover first
+  **sets the route**: the DOCU cycles the points and withholds the
+  turnback order until they relock (~3 s of extra terminus dwell).
+- `SHOW LINE` appends the switch table (position + locked/in-motion).
+
+## AVP redundancy (DOT §3.5.2.15, §4.5.9-10)
+
+Each rame carries two parallel safety strings, **PA(A)** and **PA(B)**
+(`Train.avpActiveString/avpVotingAnd/avpStringAFault/avpStringBFault`,
+all wire-carried):
+
+- A fault on the **active** string is loss of positive data → FU
+  (`avpString`, mnemonic PA-CHAINE). Recovery: select the healthy
+  string (`SET RAME /AVP=A|B`, FR `/PA=`; wire command `avpSelect`),
+  clear the fault, release the FU.
+- A fault on the **standby** string stops the rame under **AND**
+  voting (`avpDiscrepancy`, PA-DISCORD) and runs degraded under **OR**
+  (`SET RAME /VOTING=AND|OR`, FR `/VOTE=ET|OU`; wire `avpVoting`) —
+  the §4.5.10 demonstration pair.
+- String faults inject owner-only like the other equipment faults
+  (`/STRINGA=`, `/STRINGB=`, FR `/CHAINEA=`, `/CHAINEB=`; also the
+  detail window's ATP block, which shows string health, the active
+  string and the voting mode, with A/B select + voting routed over the
+  peer link).
+- Alarms: `AVP_A`/`AVP_B` (major, per string) and `AVP_DISC` (minor,
+  strings disagree — the "running degraded" warning).
 
 ## Deliberate simplifications
 
-- One berth per station, no switches: the loop has no diverging routes,
-  so switch interlocking (DOT §3.5.2.9) reduces to the SP barriers.
-- The AVP's redundant A/B strings and AND/OR voting are not modelled —
-  this is a dispatch simulator, not a safety case.
 - Blocks are the ten 100 m cantons of `Sim`; the real Lille blocks vary
-  in length with the civil profile.
+  in length with the civil profile, and the switch zones are overlays on
+  the circular loop — the diverging legs themselves (depot lead, pocket
+  tracks) are not modelled as travelable routes.
+- The A/B strings vote at the scan level (fault flags + selection), not
+  as two independently computed safety channels.
 - The uplink/downlink data links (1.333 s frames, DOT §3.5.4) are
   abstracted into the per-scan telegram; the peer wire plays the role of
   the vehicle data link.

@@ -118,12 +118,32 @@ final class VALOnboard {
         // flag, or the line emergency ends). This mirrors the old panel
         // workflow: fault chip off -> rame resumes.
         var conditionCause: VALTripCause = .none
+        let activeStringFault = train.avpActiveString == "B"
+            ? train.avpStringBFault : train.avpStringAFault
+        let standbyStringFault = train.avpActiveString == "B"
+            ? train.avpStringAFault : train.avpStringBFault
         if emergencyLine {
             conditionCause = .lineEmergency
         } else if telegram.program == .absent {
             conditionCause = .sfLoss                    // stranded / unenergized guideway
         } else if train.isSignalFault {
             conditionCause = .sfLoss                    // injected SF-carrier fault
+        } else if activeStringFault {
+            // The selected PA string no longer proves its data positive:
+            // fail-safe stop (DOT §3.5.2.15). Recovery is selecting the
+            // healthy string (or repair) + PCC reinitiation.
+            conditionCause = .avpString
+        } else if standbyStringFault && train.avpVotingAnd {
+            // AND voting compares both strings: a standby discrepancy
+            // stops the rame too. OR voting runs on the surviving string
+            // (alarmed, not tripped -- sampled by the backend).
+            conditionCause = .avpDiscrepancy
+        } else if telegram.switchViolation
+                    && !(train.mode == .manual && train.pupitreKIBS) {
+            // Inside a switch zone whose points are unlocked or set
+            // against the route (DOT §3.5.2.9). KIBS inhibits the loop
+            // for the creep-out recovery move.
+            conditionCause = .switchZone
         } else if train.isDoorFault {
             conditionCause = .doorFault
         } else if train.isBrakeFault {
@@ -274,6 +294,23 @@ final class VALOnboard {
             let curve = (telegram.nextBlockCode * telegram.nextBlockCode
                          + 2 * Sim.nominalBraking * max(0, boundary - lead)).squareRoot()
             v = min(v, curve)
+        }
+
+        // Switch-zone program (DOT §3.5.2.9): the crossover geometry
+        // encodes ~25 km/h through the points, approached on a braking
+        // curve like any code drop.
+        if let zone = telegram.switchZone {
+            let dEntry = VALTrackDatabase.distanceAhead(from: train.position, to: zone.entry,
+                                                        direction: train.travelDirection)
+            let dExit = VALTrackDatabase.distanceAhead(from: train.position, to: zone.exit,
+                                                       direction: train.travelDirection)
+            if dExit < dEntry {
+                v = min(v, zone.code)
+            } else {
+                let curve = (zone.code * zone.code
+                             + 2 * Sim.nominalBraking * max(0, dEntry - lead)).squareRoot()
+                v = min(v, curve)
+            }
         }
 
         // Decreasing-speed profile to the active stop anchor (PP or SFa).

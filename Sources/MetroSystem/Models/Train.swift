@@ -126,6 +126,16 @@ struct Train: Identifiable, Hashable, Codable {
     var kacopSecondsSinceAck: Double = 0
     var kacopWarning: Bool = false
 
+    // AVP redundancy (DOT §3.5.2.15): two parallel safety strings per
+    // rame, remotely selectable, compared in AND (a discrepancy stops
+    // the rame) or OR (runs on the surviving string, alarmed). String
+    // faults are owner-injected like the other equipment faults;
+    // selection and voting are exploitation commands on the wire.
+    var avpActiveString: String = "A"  // "A" | "B"
+    var avpVotingAnd: Bool = true      // true = AND (2/2), false = OR (1/2)
+    var avpStringAFault: Bool = false
+    var avpStringBFault: Bool = false
+
     // Tires (VAL pneumatic running gear).
     struct Tire: Identifiable, Hashable, Codable {
         let id: Int
@@ -193,6 +203,7 @@ struct Train: Identifiable, Hashable, Codable {
         case pupitreKG, pupitreReverser, pupitreLever
         case pupitreKIBS, pupitreKPH
         case kacopSecondsSinceAck, kacopWarning
+        case avpActiveString, avpVotingAnd, avpStringAFault, avpStringBFault
         case mainVoltage, batteryVoltage, cvsOutputVoltage
         case tractionCurrent, tractionTorque, lightingCurrent
         case armatureCurrent, lineCurrent, excitationCurrent, modulationRatio
@@ -256,6 +267,10 @@ struct Train: Identifiable, Hashable, Codable {
         pupitreKPH = try c.decodeIfPresent(Bool.self, forKey: .pupitreKPH) ?? false
         kacopSecondsSinceAck = try c.decodeIfPresent(Double.self, forKey: .kacopSecondsSinceAck) ?? 0
         kacopWarning = try c.decodeIfPresent(Bool.self, forKey: .kacopWarning) ?? false
+        avpActiveString = try c.decodeIfPresent(String.self, forKey: .avpActiveString) ?? "A"
+        avpVotingAnd = try c.decodeIfPresent(Bool.self, forKey: .avpVotingAnd) ?? true
+        avpStringAFault = try c.decodeIfPresent(Bool.self, forKey: .avpStringAFault) ?? false
+        avpStringBFault = try c.decodeIfPresent(Bool.self, forKey: .avpStringBFault) ?? false
         tires = try c.decodeIfPresent([Tire].self, forKey: .tires)
             ?? (1...Sim.tireCount).map { Tire(id: $0) }
         mainVoltage = try c.decodeIfPresent(Double.self, forKey: .mainVoltage) ?? 750.0

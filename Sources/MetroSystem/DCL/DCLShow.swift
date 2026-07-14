@@ -582,6 +582,11 @@ extension DCLEngine {
         case "$RESTART":  return "FALSE"
         case "$PID":      return pid
         case "$PROCESS":  return "DCL_\(username)"
+        // The active interface language, resolved live so a script sees
+        // the language in force when it RUNS (the CLI vocabulary is
+        // gated on it). Read-only: the lookup order consults builtins
+        // before user symbols, so it cannot be shadowed.
+        case "PCC$LANGUAGE": return uiLang == .fr ? "FR" : "EN"
         default:          return nil
         }
     }
@@ -816,6 +821,8 @@ extension DCLEngine {
         s += tr("login.lpd.quai") + "\n"
         s += "    " + "LRU_LOOKUP".padding(toLength: 16, withPad: " ", startingAt: 0)
         s += tr("login.lpd.lru") + "\n"
+        s += "    " + "LRU_DIR".padding(toLength: 16, withPad: " ", startingAt: 0)
+        s += tr("login.lpd.lrudir") + "\n"
         s += "\nLaunch with    RUN <image>    or    DIAGNOSE    for an interactive menu.\n"
         return s
     }

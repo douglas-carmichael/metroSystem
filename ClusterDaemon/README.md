@@ -50,12 +50,16 @@ decodes the daemon's bytes and vice versa):
 `RameSimulator.tick()` is a faithful port of the app's fixed-block VAL
 backend (`Backends/VALWayside/VALOnboard/VALTraction.swift`): block
 occupancy detection, SF/PP program selection, the AVP trips (survitesse,
-PP overrun, block penetration, rollback, KACOP vigilance), jerk-limited
-AVO regulation with the B-beacon station stops, console-A22 manual
-driving, and the image-série traction envelope with Davis resistance.
+PP overrun, block penetration, rollback, KACOP vigilance, A/B string
+faults under AND/OR voting), jerk-limited AVO regulation with the
+B-beacon station stops, the 25 km/h switch-zone speed program,
+console-A22 manual driving, and the image-série traction envelope with
+Davis resistance.
 Omitted as app-side detail: SCADA alarm sampling, service provisoire,
-the line-service switch, and the per-bogie wheel-slip integration (fault
-injection is owner-only, so a daemon rame never sees the degraded-
-adhesion patch that model exists for). The sim ticks at 60 Hz; the
-daemon re-broadcasts `.state` at `--rate` Hz (default 60). Wire
-compatibility is the invariant — the app decodes these bytes.
+the line-service switch, switch *throws* (a daemon node's points sit
+locked on the through route — only the zone speed program applies; the
+app's wayside owns the interlocking), and the per-bogie wheel-slip
+integration (fault injection is owner-only, so a daemon rame never sees
+the degraded-adhesion patch that model exists for). The sim ticks at
+60 Hz; the daemon re-broadcasts `.state` at `--rate` Hz (default 60).
+Wire compatibility is the invariant — the app decodes these bytes.

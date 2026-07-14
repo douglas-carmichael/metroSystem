@@ -73,6 +73,9 @@ enum VALTripCause: String, Codable {
     case lineEmergency     // arrêt d'urgence général / SF withdrawn line-wide
     case controllerAlarm   // PCC watchdog interlock
     case operatorFU        // FU commanded from the PCC / pupitre
+    case switchZone        // penetrated an unlocked / mis-set switch zone
+    case avpString         // active AVP string lost (no positive data)
+    case avpDiscrepancy    // A/B strings disagree under AND voting
 
     var mnemonic: String {
         switch self {
@@ -89,6 +92,9 @@ enum VALTripCause: String, Codable {
         case .lineEmergency:    return "URGENCE"
         case .controllerAlarm:  return "PCC"
         case .operatorFU:       return "FU-CDE"
+        case .switchZone:       return "AIGUILLE"
+        case .avpString:        return "PA-CHAINE"
+        case .avpDiscrepancy:   return "PA-DISCORD"
         }
     }
 
@@ -112,6 +118,9 @@ enum VALTripCause: String, Codable {
         case .brakeFault:       return "TRACTION SAFETY RACK: APEP / ESSCT"
         case .lineEmergency:    return "WCU: SF withdrawal (line-wide)"
         case .controllerAlarm:  return "PCC: CC watchdog / DTU"
+        case .switchZone:       return "WCU: CKDO2 / INTREL · switch motor"
+        case .avpString:        return "OBCU: active PA string (SAFETY RACK)"
+        case .avpDiscrepancy:   return "OBCU: PA(A)/PA(B) comparison (SAFETY RACK)"
         }
     }
 }
@@ -240,6 +249,17 @@ struct VALTelegram {
     /// and the rame is within the entry zone: metres progressed past the
     /// block entry. The AVP's sequential-detection penetration trip.
     var penetrationDepth: Double? = nil
+    /// Nearest switch zone at or ahead of the rame (within the approach
+    /// lookahead): entry/exit are absolute loop positions, `code` the
+    /// through-speed the crossover geometry encodes. Present whether the
+    /// route is available or not -- the speed profile always applies.
+    var switchZone: (entry: Double, exit: Double, code: Double)? = nil
+    /// True when that zone's route is NOT available (switch in motion or
+    /// locked off the through route): the WCU commands a perturbed stop
+    /// before the zone, and being inside it is an FU violation.
+    var switchBarred: Bool = false
+    /// True when the rame is INSIDE a barred zone -- the violation trip.
+    var switchViolation: Bool = false
 }
 
 /// Console A22 -- the pupitre de conduite manuelle carried at each end

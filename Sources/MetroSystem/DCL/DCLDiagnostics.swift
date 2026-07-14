@@ -421,7 +421,14 @@ extension DCLEngine {
                          runner: { [weak self] in self?.startQuaiLampTest() }),
             DiagMenuItem(image: "LRU_LOOKUP",
                          description: descOf("login.lpd.lru", image: "LRU_LOOKUP"),
-                         runner: { [weak self] in self?.startLRULookup() })
+                         runner: { [weak self] in self?.startLRULookup() }),
+            DiagMenuItem(image: "LRU_DIR",
+                         description: descOf("login.lpd.lrudir", image: "LRU_DIR"),
+                         runner: { [weak self] in
+                             // The browser handles its own exit and pops
+                             // back to the menu via diagInvokedFromMenu.
+                             self?.startLRUBrowser()
+                         })
         ]
         diagMenuSelection = 0
         liveMode = .diagnosticMenu
