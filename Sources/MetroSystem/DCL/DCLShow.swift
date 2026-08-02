@@ -46,6 +46,10 @@ extension DCLEngine {
         case matches(what, "AUDIT",       min: 3): return showAudit()
         case matches(what, "DIAGNOSTICS", min: 4): return showDiagnostics()
         default:
+            // DCLixKit answers only keywords this switch doesn't, and the
+            // bridge reserves every name listed above so it cannot shadow
+            // one of them.
+            if let text = dclixShow(cmd) { return text }
             fail("DCL-W-IVKEYW", "%X00038088")
             return "%DCL-W-IVKEYW, unrecognized keyword - check validity and spelling\n   \\\(what)\\\n"
         }

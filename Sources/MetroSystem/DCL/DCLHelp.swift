@@ -31,7 +31,10 @@ extension DCLEngine {
             "$USER$": username,
             "$STOREROOT$": scriptStore.rootPath,
         ]
-        let root = HelpLibrary.parse(source: HelpLibrary.source, substitutions: subs)
+        // The app's library with DCLix's topics merged in -- its SHOW / SET /
+        // ACCOUNTING subtopics are added inside the existing topics.
+        let root = HelpLibrary.parse(source: DCLEngine.dclixHelpSource,
+                                     substitutions: subs)
         helpRootCache = root
         return root
     }
@@ -314,7 +317,7 @@ extension DCLEngine {
             "HELP ACKNOWLEDGE", "HELP START", "HELP STOP", "HELP METRO",
             "HELP SCRIPTING", "HELP TUTORIAL", "HELP HINTS",
             "HELP INSTRUCTIONS", "HELP NOSUCHTOPIC",
-        ]
+        ] + dclixSelfTestLines
 
         var passed = 0
         var lines: [String] = []

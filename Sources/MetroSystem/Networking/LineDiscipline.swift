@@ -60,6 +60,12 @@ final class LineDiscipline {
             dcl.handleScreenEditorKey(bytes)
             return
         }
+        // A DCLix DECforms panel. Tested through a bridge-provided flag
+        // rather than a LiveMode case, so that enum is unchanged.
+        if dcl.dclixWantsKeystrokes {
+            dcl.handleDCLixFormKey(bytes)
+            return
+        }
         var dirty = false
         for b in bytes {
             switch escState {

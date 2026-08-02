@@ -6,6 +6,10 @@ options:
   createIntermediateGroups: true
   generateEmptyDirectories: true
 
+packages:
+  DCLixKit:
+    path: ../dclix_swift
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -22,6 +26,8 @@ targets:
   MetroSystem:
     type: application
     platform: macOS
+    dependencies:
+      - package: DCLixKit
     sources:
       - path: Sources/MetroSystem
       - path: Resources/Fonts

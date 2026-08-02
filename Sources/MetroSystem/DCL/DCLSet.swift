@@ -22,6 +22,7 @@ extension DCLEngine {
         case matchesLoc(what, en: "LINE", fr: "LIGNE", min: 4):
             return setLigne(cmd)
         default:
+            if let text = dclixSet(cmd) { return text }
             return noPriv("SET \(what)")
         }
     }

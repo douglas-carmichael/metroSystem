@@ -507,6 +507,19 @@ final class DCLEngine: ObservableObject {
             return
         }
 
+        // DCLix line-mode utility (UAF>, SYSMAN>) owns the line, exactly
+        // as the EDT and MAIL subshells above do.
+        if dclixSubshellActive {
+            transcript += "\(prompt)\(raw)\n"
+            let body = dclixSubshellLine(raw)
+            if !body.isEmpty {
+                out(body)
+                if !body.hasSuffix("\n") { out("\n") }
+            }
+            if !loggedOut { out(prompt) }
+            return
+        }
+
         // /PAGE pager: while paginating, each RETURN shows the next
         // screenful and Q / CTRL/Z quits early. Consumes the line without
         // running it as a command (mirrors the helpActive reroute).
@@ -871,6 +884,10 @@ final class DCLEngine: ObservableObject {
         case matches(head, "CONTINUE", min: 3):               return ""
 
         default:
+            // DCLixKit: the system-management and layered-product language
+            // surface. Reached only here, where the engine has nothing --
+            // it returns nil for every verb implemented above.
+            if let text = dclixFallback(line) { return text }
             return ivverb(head)
         }
     }
@@ -911,6 +928,9 @@ final class DCLEngine: ObservableObject {
     // MARK: -- LOGOUT
 
     func logoutText(full: Bool) -> String {
+        // Write the LOGOUT accounting record and drop the session from
+        // SHOW USERS before the terminal goes away.
+        dclixEndSession()
         var s = "\n  \(username)       logged out at \(stamp(Date()))\n"
         if full {
             let upS = Int(host.uptime())

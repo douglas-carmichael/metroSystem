@@ -69,6 +69,13 @@ extension DCLEngine {
     /// triggers this.
     func stopMonitor(interrupt: Bool = true) {
         guard liveActive else { return }
+        // Ctrl/Y over a DCLix DECforms panel closes the panel and returns
+        // to the prompt; the panel owns its own alternate-screen state.
+        if dclixWantsKeystrokes {
+            dclixAbort()
+            out(prompt)
+            return
+        }
         liveTimer?.invalidate()
         liveTimer = nil
         let wasTest: Bool
