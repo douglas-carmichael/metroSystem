@@ -1125,6 +1125,11 @@ enum Strings {
         add("diag.reading.noRame",  "(no train)",                          "(aucune rame)")
         add("diag.reading.noWorld", "(no world)",                          "(aucun monde)")
 
+        // DCLixKit overrides. The package ships generic wording for every
+        // key it prints; anything added here wins, so the shared system
+        // layer speaks this app's vocabulary.
+        add("cluster.nojobs",       "No rames owned.",                     "Aucune rame détenue.")
+
         return t
     }
 
