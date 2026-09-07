@@ -2,7 +2,8 @@ name: macOS app
 
 # Builds the XcodeGen-generated MetroSystem app on macOS. The .xcodeproj is
 # .gitignore'd (generated from project.yml), so CI installs XcodeGen, runs
-# `xcodegen generate`, then builds the app scheme.
+# `xcodegen generate`, then builds the app scheme. DCLixKit is a git
+# submodule the app depends on, so the checkout fetches submodules.
 #
 # Needs the macos-26 image (Xcode 26.x default): the app targets macOS 15
 # and uses macOS-15+ SwiftUI API, and current XcodeGen (2.45+) emits a
@@ -20,6 +21,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Install XcodeGen
         run: brew install xcodegen
