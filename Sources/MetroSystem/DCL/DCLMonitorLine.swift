@@ -79,9 +79,13 @@ extension DCLEngine {
 
     /// VMS absolute time with the month abbreviation in the session
     /// language -- what LIB$FORMAT_DATE_TIME yields under SYS$LANGUAGE
-    /// FRENCH. The rest of the format is identical in both.
+    /// FRENCH. The rest of the format is identical in both. Truncated to
+    /// whole seconds, as on an operator display: the hundredths are a VMS
+    /// system-time artefact, and at a 0.5 s refresh they would rewrite
+    /// the status row on every frame.
     private func lpdStamp(_ date: Date) -> String {
-        let s = stamp(date)
+        var s = stamp(date)
+        if let dot = s.lastIndex(of: ".") { s = String(s[..<dot]) }
         guard uiLang == .fr else { return s }
         let fr = ["JAN": "JAN", "FEB": "FÉV", "MAR": "MAR", "APR": "AVR",
                   "MAY": "MAI", "JUN": "JUN", "JUL": "JUL", "AUG": "AOÛ",
@@ -122,6 +126,27 @@ extension DCLEngine {
             }
         }
         return n
+    }
+
+    /// Truncate a row to the pasteboard width, counting only printable
+    /// characters (SGR escapes pass through), so an over-long row can
+    /// never auto-wrap on the 80-column screen and shift the rows below.
+    private func clipToScreen(_ s: String) -> String {
+        var out = ""
+        var n = 0
+        var inEsc = false
+        for u in s.unicodeScalars {
+            if inEsc {
+                if (0x40...0x7E).contains(u.value) && u != "[" { inEsc = false }
+            } else if u == "\u{1B}" {
+                inEsc = true
+            } else {
+                if n == Self.screenWidth { continue }
+                n += 1
+            }
+            out.unicodeScalars.append(u)
+        }
+        return out
     }
 
     /// One bordered SMG virtual display (SMG$CREATE_VIRTUAL_DISPLAY with
@@ -184,9 +209,12 @@ extension DCLEngine {
         }
         var mode = tr(modeKey)
         if world.lineMode == .emergency && blinkOn { mode = "\u{1B}[7m" + mode + "\u{1B}[27m" }
-        screen.append(" " + lpdStamp(now) + "   "
+        // The train count lives in the TRAINS display label; with it here
+        // the FR emergency line ran past 79 columns and wrapped, pushing
+        // every row below it down one line.
+        screen.append(clipToScreen(" " + lpdStamp(now) + "   "
                       + String(format: tr("valcp.mon.status"),
-                               mode, BackendManager.shared.kind.rawValue, trains.count))
+                               mode, BackendManager.shared.kind.rawValue)))
 
         // MARK: track geometry
 

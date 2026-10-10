@@ -810,7 +810,7 @@ enum Strings {
                                     "%VALCP-W-INTERRUPT, moniteur de ligne interrompu par CTRL/Y\n")
         add("valcp.mon.title",      "LINE MONITOR",                        "MONITEUR DE LIGNE")
         add("valcp.mon.node",       "Node %@",                             "Nœud %@")
-        add("valcp.mon.status",     "Mode: %@   Backend: %@   Trains: %d", "Mode : %@   Moteur : %@   Rames : %d")
+        add("valcp.mon.status",     "Mode: %@   Backend: %@",               "Mode : %@   Moteur : %@")
         add("valcp.mon.mode.normal","NORMAL (ATO)",                        "NORMAL (CAI)")
         add("valcp.mon.block.short","B%d",                                 "C%d")
         // SMG$LABEL_BORDER labels of the three virtual displays.

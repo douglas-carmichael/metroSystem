@@ -19,11 +19,11 @@ struct DCLShellWindow: View {
     @State private var didAttach = false
 
     var body: some View {
-        // The full-screen diagnostic display (DCLDiagnostics.refreshTestDisplay)
-        // homes the cursor and paints an 18-line, 78-column box; the
-        // login banner + LPD splash + prompt also runs ~22 lines. Size the
-        // window so the terminal computes at least 24 rows / 80 cols at the
-        // VT323 16pt body font, otherwise the top scrolls off the screen.
+        // The shell screen grows its grid with the window at the VT323 16pt
+        // body font; full-screen displays use the fixed 80 x 24 alt screen,
+        // which scales to fill the window (RetroTerminalView.screenCols/
+        // screenRows). The minimum size keeps at least 80 x 24 at the
+        // prompt so the login banner + LPD splash don't scroll off.
         VTShellView(dcl: dcl)
             .frame(minWidth: 820, minHeight: 600)
             .background(Color.black)

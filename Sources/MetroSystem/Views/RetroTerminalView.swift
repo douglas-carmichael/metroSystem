@@ -48,8 +48,21 @@ final class RetroTerminalView: NSView {
 
     let font: NSFont
 
-    private(set) var cols: Int = 1
-    private(set) var rows: Int = 1
+    /// Fixed VT320 geometry of the alternate screen. The DCL full-screen
+    /// displays (MONITOR, VALCP MONITOR LINE, EDT, the test utilities,
+    /// LRU_DIR) all enter the alt buffer and paint a 24 x 80 pasteboard,
+    /// so the alt screen is always 80 x 24 and its glyphs scale to fill
+    /// the window. The primary (shell) screen keeps the natural font size
+    /// and grows its grid with the window.
+    static let screenCols = 80
+    static let screenRows = 24
+
+    private var primaryCols: Int = 1
+    private var primaryRows: Int = 1
+
+    /// Dimensions of the active buffer.
+    var cols: Int { inAltBuffer ? Self.screenCols : primaryCols }
+    var rows: Int { inAltBuffer ? Self.screenRows : primaryRows }
 
     // MARK: - Cell + Buffer
 
@@ -140,7 +153,12 @@ final class RetroTerminalView: NSView {
         super.init(frame: frame)
         wantsLayer = true
         layer?.backgroundColor = backgroundColor.cgColor
+        alternate = Self.blankScreen(cols: Self.screenCols, rows: Self.screenRows)
         recomputeGrid()
+    }
+
+    private static func blankScreen(cols: Int, rows: Int) -> [[Cell]] {
+        Array(repeating: Array(repeating: Cell(), count: cols), count: rows)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
@@ -153,39 +171,68 @@ final class RetroTerminalView: NSView {
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         recomputeGrid()
-        if !hasReportedReady, cols > 1, rows > 1 {
+        needsDisplay = true
+        if !hasReportedReady, primaryCols > 1, primaryRows > 1 {
             hasReportedReady = true
             onReady?()
         }
     }
 
-    /// Recompute cols/rows from the current bounds and reshape both
-    /// buffers preserving any existing content (truncated to the new
+    /// Recompute the primary screen's cols/rows from the current bounds
+    /// and reshape it preserving existing content (truncated to the new
     /// dimensions). Reserves one cell of vertical padding at the bottom
     /// so the prompt row (which is always cursor's row after engine
-    /// output) isn't clipped by the window's bottom edge / chrome.
+    /// output) isn't clipped by the window's bottom edge / chrome. The
+    /// alt screen is fixed at 80 x 24 and only rescales.
     private func recomputeGrid() {
         let newCols = max(1, Int(bounds.width / cellWidth))
-        let raw = Int((bounds.height - cellHeight) / cellHeight)
-        let newRows = max(1, raw)
-        if newCols == cols && newRows == rows && !primary.isEmpty { return }
-        cols = newCols
-        rows = newRows
-        primary   = Self.reshape(primary,   cols: newCols, rows: newRows)
-        alternate = Self.reshape(alternate, cols: newCols, rows: newRows)
-        cursorRow = min(cursorRow, max(0, rows - 1))
-        cursorCol = min(cursorCol, max(0, cols - 1))
-        needsDisplay = true
+        let newRows = max(1, Int((bounds.height - cellHeight) / cellHeight))
+        if newCols == primaryCols && newRows == primaryRows && !primary.isEmpty { return }
+        primaryCols = newCols
+        primaryRows = newRows
+        primary = Self.reshape(primary, cols: newCols, rows: newRows)
+        if !inAltBuffer {
+            cursorRow = min(cursorRow, max(0, rows - 1))
+            cursorCol = min(cursorCol, max(0, cols - 1))
+        } else {
+            altReturnRow = min(altReturnRow, max(0, newRows - 1))
+            altReturnCol = min(altReturnCol, max(0, newCols - 1))
+        }
     }
 
     private static func reshape(_ src: [[Cell]], cols: Int, rows: Int) -> [[Cell]] {
-        var result = Array(repeating: Array(repeating: Cell(), count: cols), count: rows)
+        var result = blankScreen(cols: cols, rows: rows)
         for r in 0..<min(rows, src.count) {
             for c in 0..<min(cols, src[r].count) {
                 result[r][c] = src[r][c]
             }
         }
         return result
+    }
+
+    /// Uniform scale that fits the 80 x 24 alt screen (laid out at the
+    /// font's natural cell size) into the view, keeping the glyph aspect
+    /// ratio. The primary screen always draws at its natural size.
+    /// A small inset keeps the outer rows/columns off the window edge.
+    private static let screenInset: CGFloat = 6
+
+    private var screenScale: CGFloat {
+        guard inAltBuffer else { return 1 }
+        let naturalW = CGFloat(cols) * cellWidth
+        let naturalH = CGFloat(rows) * cellHeight
+        let availW = max(1, bounds.width  - 2 * Self.screenInset)
+        let availH = max(1, bounds.height - 2 * Self.screenInset)
+        return max(0.01, min(availW / naturalW, availH / naturalH))
+    }
+
+    /// Top-left corner of the scaled screen: centred in the leftover
+    /// letterbox space along whichever axis has slack.
+    private var screenOrigin: CGPoint {
+        guard inAltBuffer else { return .zero }
+        let s = screenScale
+        let w = CGFloat(cols) * cellWidth * s
+        let h = CGFloat(rows) * cellHeight * s
+        return CGPoint(x: (bounds.width - w) / 2, y: (bounds.height - h) / 2)
     }
 
     // MARK: - Feed
@@ -295,8 +342,8 @@ final class RetroTerminalView: NSView {
             parser = .ground
         case 0x63:                                  // 'c' RIS -- full reset
             inAltBuffer = false
-            primary   = Array(repeating: Array(repeating: Cell(), count: cols), count: rows)
-            alternate = Array(repeating: Array(repeating: Cell(), count: cols), count: rows)
+            primary   = Self.blankScreen(cols: primaryCols, rows: primaryRows)
+            alternate = Self.blankScreen(cols: Self.screenCols, rows: Self.screenRows)
             cursorRow = 0
             cursorCol = 0
             currentReverse = false
@@ -417,8 +464,9 @@ final class RetroTerminalView: NSView {
                         altReturnRow = cursorRow
                         altReturnCol = cursorCol
                         // Snap into alt buffer; clear it on entry.
-                        alternate = Array(repeating: Array(repeating: Cell(), count: cols), count: rows)
+                        alternate = Self.blankScreen(cols: Self.screenCols, rows: Self.screenRows)
                         inAltBuffer = true
+                        needsDisplay = true
                         cursorRow = 0
                         cursorCol = 0
                     }
@@ -482,6 +530,17 @@ final class RetroTerminalView: NSView {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         ctx.setFillColor(backgroundColor.cgColor)
         ctx.fill(bounds)
+
+        // Lay the grid out at the font's natural cell size and let the CTM
+        // scale it up to fill the window. NSAttributedString.draw renders
+        // through the same CGContext, so the transform applies to glyphs,
+        // reverse-video blocks and the cursor alike, and the vector font
+        // stays crisp at any size.
+        ctx.saveGState()
+        defer { ctx.restoreGState() }
+        let origin = screenOrigin
+        ctx.translateBy(x: origin.x, y: origin.y)
+        ctx.scaleBy(x: screenScale, y: screenScale)
 
         // Build a single attributed string per row and render in one
         // shot. The fixed-pitch font keeps the column math trivial.
