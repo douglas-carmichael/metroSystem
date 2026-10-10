@@ -82,6 +82,28 @@ struct PraticTrain: Identifiable, Codable {
     /// Regulation output for the detail displays (consigne vitesse).
     var consigne: Double = 0
 
+    // Passenger-station stops. Only the simulated autopilot fills these
+    // (a real PRATIC train runs its own stopping program), so on the
+    // hardware backend they stay at their idle defaults.
+    /// Seconds left in the current doors-open dwell; > 0 while à quai.
+    var dwellRemaining: Double = 0
+    /// Station the train last stopped at, so it departs instead of
+    /// re-stopping at the marker it is still sitting on.
+    var lastServicedStationId: Int? = nil
+    /// Station the autopilot is braking for, if one is in the window.
+    var nextStationId: Int? = nil
+    var isDwelling: Bool { dwellRemaining > 0 }
+
+    // Passenger load and the exchange in progress at the current stop
+    // (passenger-service mode only; zero on the TEST bench).
+    var passengerCount: Int = 0
+    var paxBoarding: Int = 0
+    var paxAlighting: Int = 0
+    /// Net change still to apply this dwell (+ boarding, - alighting).
+    var paxRemaining: Int = 0
+    var paxExchangeInterval: Double = 1.0
+    var paxExchangeTimer: Double = 0
+
     /// Segment-relative coordinate (segment = canton).
     var segmentId: Int {
         min(Sim.cantonCount, Int(position / Sim.cantonLength) + 1)

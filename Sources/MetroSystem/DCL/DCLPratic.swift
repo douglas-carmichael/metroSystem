@@ -72,10 +72,18 @@ extension DCLEngine {
         if let why = pratic.transportState.failureReason {
             link = String(format: link, why)
         }
-        s += "  " + String(format: tr("backend.transport"), link) + "\n\n"
+        s += "  " + String(format: tr("backend.transport"), link) + "\n"
+        if pratic is PraticSimBackend {
+            let mode = BackendManager.shared.praticPassengerService ? "PASSENGER" : "TEST"
+            s += "  " + String(format: tr("pratic.sim.mode"), mode) + "\n"
+        }
+        s += "\n"
 
         s += "  " + tr("pratic.trains.header") + "\n"
-        s += "  ------  ---------  ------  --------------  ------  --------  ------------  ------\n"
+        s += "  ------  ---------  ------  --------------  ------  -------  ----------  -------------  ------\n"
+        // The load only means something under passenger service; the
+        // TEST bench and the real network show "--".
+        let showLoad = pratic is PraticSimBackend && BackendManager.shared.praticPassengerService
         if net.trains.isEmpty {
             s += "  " + tr("pratic.trains.none") + "\n"
         }
@@ -88,12 +96,14 @@ extension DCLEngine {
                 .padding(toLength: 14, withPad: " ", startingAt: 0)
             let maAge = Int(now.timeIntervalSince(t.maIssuedAt))
             let ma = String(format: "%4.0f m", t.maLimit).padding(toLength: 6, withPad: " ", startingAt: 0)
+            let pax = (showLoad ? "\(t.passengerCount)/\(Sim.paxCapacity)" : "--")
+                .padding(toLength: 7, withPad: " ", startingAt: 0)
             let linkTag = tr(t.linkStatus.localizationKey)
                 .padding(toLength: 10, withPad: " ", startingAt: 0)
             let conf = tr(t.confidence.localizationKey)
                 .padding(toLength: 13, withPad: " ", startingAt: 0)
             let unc = String(format: "±%.0fm", t.uncertainty)
-            s += "  \(label)  \(pos)  \(seg)  \(speed)  \(ma)  \(linkTag)  \(conf)  \(unc) (MA \(maAge)s)\n"
+            s += "  \(label)  \(pos)  \(seg)  \(speed)  \(ma)  \(pax)  \(linkTag)  \(conf)  \(unc) (MA \(maAge)s)\n"
         }
 
         s += "\n  " + tr("pratic.wayside.header") + "\n"
@@ -131,14 +141,37 @@ extension DCLEngine {
     ///            /RESTORE=COMMS:train | /RESTORE=SENSOR:station
     ///            /TRANSPORT=JSONL|SERIAL /HOST=h /PORT=n
     ///            /CONNECT /DISCONNECT
+    ///            /SIMULATION=PASSENGER|TEST
     func setPratic(_ cmd: Parsed) -> String {
         if dryRun {
             return "%PRATIC-I-DRYRUN, would apply PRATIC network settings (no change made)\n"
         }
+        var lines: [String] = []
+
+        // The simulation mode is a PRATIC_SIM setting that persists across
+        // backend switches, so it may be pre-set before SET BACKEND
+        // PRATIC_SIM; only the real network refuses it.
+        if let spec = cmd.qualifierValue("SIMULATION", min: 3) {
+            if BackendManager.shared.kind == .praticHardware {
+                lines.append(tr("pratic.set.sim.unsup"))
+            } else {
+                switch spec.uppercased() {
+                case "PASSENGER", "PASSENGERS", "PAX", "ON":
+                    BackendManager.shared.praticPassengerService = true
+                    lines.append(tr("pratic.set.sim.passenger"))
+                case "TEST", "OFF":
+                    BackendManager.shared.praticPassengerService = false
+                    lines.append(tr("pratic.set.sim.test"))
+                default:
+                    lines.append(tr("pratic.set.sim.usage"))
+                }
+            }
+        }
+
         guard let pratic = BackendManager.shared.pratic else {
+            if !lines.isEmpty { return lines.joined(separator: "\n") + "\n" }
             return tr("pratic.notactive") + "\n"
         }
-        var lines: [String] = []
 
         if let spec = cmd.qualifierValue("MA", min: 2) {
             let parts = pairParts(spec)

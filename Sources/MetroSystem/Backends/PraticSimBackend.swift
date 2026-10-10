@@ -68,8 +68,13 @@ final class PraticSimBackend: PraticBackend {
             network.syncIntents(into: &network.trains[idx], world: world)
         }
         computeAuthorities(now: now)
+        // Passenger-service mode (SET PRATIC /SIMULATION=PASSENGER): the
+        // autopilot serves the stations; in TEST mode it free-runs on the
+        // MA picture alone, the bare CBTC bench.
+        let stations = BackendManager.shared.praticPassengerService ? world.activeStations() : []
         for idx in network.trains.indices {
-            advance(&network.trains[idx], dt: dt, now: now, isRunning: world.isRunning)
+            advance(&network.trains[idx], dt: dt, now: now,
+                    isRunning: world.isRunning, stations: stations)
         }
         updateWayside(now: now)
         sampleAlarms(world: world)
@@ -142,7 +147,8 @@ final class PraticSimBackend: PraticBackend {
 
     /// The onboard pass: heartbeat/link model, odometry drift and balise
     /// fixes, confidence derivation, then the autopilot regulation.
-    private func advance(_ train: inout PraticTrain, dt: Double, now: Date, isRunning: Bool) {
+    private func advance(_ train: inout PraticTrain, dt: Double, now: Date,
+                         isRunning: Bool, stations: [Station]) {
         // Heartbeats arrive every scan unless the comms loss injection
         // holds them; link health derives from the silence.
         if !commsLost.contains(train.label) {
@@ -175,19 +181,65 @@ final class PraticSimBackend: PraticBackend {
             train.confidence = .localized
         }
 
+        // Station stopping target (auto only -- a manual driver stops by
+        // hand): the nearest unserviced served station inside the
+        // approach window. The window starts just behind the marker so a
+        // train that halts a little past it still counts as arrived.
+        // Leaving passenger service (or auto) ends any dwell in progress.
+        if stations.isEmpty {
+            if train.isDwelling || train.passengerCount > 0 { endDwell(&train, emptyTrain: true) }
+            train.lastServicedStationId = nil
+        } else if !train.modeAuto && train.isDwelling {
+            endDwell(&train, emptyTrain: false)
+        }
+        var stopDistance: Double? = nil
+        train.nextStationId = nil
+        if train.modeAuto && !train.isDwelling {
+            for station in stations where station.id != train.lastServicedStationId {
+                var d = network.distanceAhead(from: train, to: station.position)
+                if d > Sim.trackLength - Sim.stationStopTolerance { d -= Sim.trackLength }
+                if d < Sim.stationApproachWindow, stopDistance.map({ d < $0 }) ?? true {
+                    stopDistance = d
+                    train.nextStationId = station.id
+                }
+            }
+        }
+        // Once the train has pulled away from its last stop, forget it so
+        // a single-station loop (or a short SP) still stops next lap.
+        if !train.isDwelling, let lastId = train.lastServicedStationId,
+           let last = stations.first(where: { $0.id == lastId }) {
+            let behind = network.distanceAhead(from: train, to: last.position)
+            if behind > Sim.stationStopTolerance && behind < Sim.trackLength - Sim.stationStopTolerance {
+                train.lastServicedStationId = nil
+            }
+        }
+
         // Autopilot: emergency stop, MA timeout (link not ok), service
         // off and delocalization all brake to a stand; otherwise regulate
-        // to the braking curve toward the limit of authority.
+        // to the braking curve toward the nearer of the limit of
+        // authority and the station stop marker, then dwell à quai.
         var consigne: Double = 0
         var brakingRate = Sim.nominalBraking
         if train.emergencyStopped || train.confidence == .delocalized {
             brakingRate = Sim.emergencyBraking
         } else if isRunning && train.linkStatus == .ok {
-            if train.modeAuto {
+            if train.modeAuto && train.isDwelling {
+                // Doors open: hold at a stand until the dwell expires.
+                runDwell(&train, dt: dt)
+            } else if train.modeAuto, let d = stopDistance, abs(d) <= Sim.stationStopTolerance,
+                      train.speed < 0.1, let stationId = train.nextStationId {
+                // Arrived on the marker: open up and start the dwell.
+                beginDwell(&train, stationId: stationId)
+            } else if train.modeAuto {
                 let distance = network.distanceAhead(from: train, to: train.maLimit)
                 if distance > Sim.maDistanceMargin {
                     let curve = (2 * Sim.nominalBraking * (distance - Sim.maDistanceMargin)).squareRoot()
                     consigne = min(train.maProfileSpeed, curve)
+                }
+                // The stop marker is a target, not an obstacle: brake to
+                // it exactly (no MA margin) so the train halts on it.
+                if let d = stopDistance {
+                    consigne = min(consigne, (2 * Sim.nominalBraking * max(0, d)).squareRoot())
                 }
             } else {
                 consigne = min(train.manualSpeedRequest, Sim.manualSpeedMax)
@@ -211,6 +263,62 @@ final class PraticSimBackend: PraticBackend {
         if train.position < 0 { train.position += Sim.trackLength }
         // Odometry drift between fixes.
         train.uncertainty += travelled * Sim.praticUncertaintyGrowth
+    }
+
+    // MARK: -- station dwell / passenger exchange (passenger-service mode)
+
+    /// Doors open on the marker: draw the alighting (descente) and
+    /// boarding (montée) flows -- the same exchange model as the VAL and
+    /// CBTC_SIM backends -- and pace the net change across the dwell.
+    private func beginDwell(_ train: inout PraticTrain, stationId: Int) {
+        train.speed = 0
+        let dwell = Double.random(in: Sim.dwellMin...Sim.dwellMax)
+        train.dwellRemaining = dwell
+        train.lastServicedStationId = stationId
+        let alighting = Int.random(in: 0...min(Sim.paxAlightMax, train.passengerCount))
+        let headroom = max(0, Sim.paxCapacity - (train.passengerCount - alighting))
+        let boarding = Int.random(in: 0...min(Sim.paxBoardMax, headroom))
+        let change = boarding - alighting
+        train.paxAlighting = alighting
+        train.paxBoarding = boarding
+        train.paxRemaining = change
+        train.paxExchangeInterval = change != 0 ? (dwell * 0.6) / Double(abs(change)) : 1.0
+        train.paxExchangeTimer = 0
+    }
+
+    /// One scan of a dwell: step the load one passenger at a time, and
+    /// settle the exchange when the doors close.
+    private func runDwell(_ train: inout PraticTrain, dt: Double) {
+        train.speed = 0
+        train.dwellRemaining = max(0, train.dwellRemaining - dt)
+        if train.dwellRemaining == 0 {
+            endDwell(&train, emptyTrain: false)
+            return
+        }
+        guard train.paxRemaining != 0 else { return }
+        train.paxExchangeTimer -= dt
+        if train.paxExchangeTimer <= 0 {
+            if train.paxRemaining > 0 {
+                train.passengerCount += 1
+                train.paxRemaining -= 1
+            } else {
+                train.passengerCount = max(0, train.passengerCount - 1)
+                train.paxRemaining += 1
+            }
+            train.paxExchangeTimer = train.paxExchangeInterval
+        }
+    }
+
+    /// Close the doors: settle any exchange still pending, or -- leaving
+    /// passenger service for the TEST bench -- run the train empty.
+    private func endDwell(_ train: inout PraticTrain, emptyTrain: Bool) {
+        train.passengerCount = emptyTrain
+            ? 0
+            : max(0, min(Sim.paxCapacity, train.passengerCount + train.paxRemaining))
+        train.paxRemaining = 0
+        train.paxBoarding = 0
+        train.paxAlighting = 0
+        train.dwellRemaining = 0
     }
 
     private func updateWayside(now: Date) {

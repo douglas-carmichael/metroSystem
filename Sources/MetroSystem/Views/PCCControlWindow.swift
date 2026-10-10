@@ -332,6 +332,7 @@ private struct StatusStrip: View {
 private struct LineControlPanel: View {
     @EnvironmentObject var world: MetroWorld
     @EnvironmentObject var language: AppLanguage
+    @ObservedObject private var backends = BackendManager.shared
 
     @State private var spFrom: Int = 1
     @State private var spTo: Int = 3
@@ -394,6 +395,26 @@ private struct LineControlPanel: View {
                         world.setServiceProvisoire(nil)
                     }
                     Spacer()
+                }
+                // PRATIC_SIM simulation mode (same switch as SET PRATIC
+                // /SIMULATION=): passenger service vs the bare CBTC bench.
+                if backends.kind == .praticSim {
+                    HStack(spacing: 8) {
+                        Text("\(language.t("line.sim.label")):")
+                            .font(RetroTheme.monoSm)
+                            .foregroundColor(RetroTheme.amberDim)
+                            .lineLimit(1)
+                            .fixedSize()
+                        RetroButton(language.t("line.sim.passenger"),
+                                    highlighted: backends.praticPassengerService) {
+                            backends.praticPassengerService = true
+                        }
+                        RetroButton(language.t("line.sim.test"),
+                                    highlighted: !backends.praticPassengerService) {
+                            backends.praticPassengerService = false
+                        }
+                        Spacer()
+                    }
                 }
                 if let sp = world.activeSP {
                     Text(String(format: language.t("line.sp.active"),

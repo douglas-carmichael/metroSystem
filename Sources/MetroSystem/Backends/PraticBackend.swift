@@ -97,6 +97,19 @@ final class BackendManager: ObservableObject {
     static let shared = BackendManager()
 
     @Published private(set) var kind: BackendKind = .val
+
+    /// PRATIC_SIM simulation mode: PASSENGER (station stops, dwells and
+    /// passenger exchange -- a revenue-service picture for demos) vs TEST
+    /// (the bare CBTC bench: trains free-run on the MA alone). Persisted,
+    /// so it survives a relaunch; `-praticPassengerService YES` on the
+    /// command line forces it on through the arguments domain.
+    @Published var praticPassengerService: Bool =
+        UserDefaults.standard.bool(forKey: BackendManager.passengerServiceKey) {
+        didSet {
+            UserDefaults.standard.set(praticPassengerService, forKey: Self.passengerServiceKey)
+        }
+    }
+    private static let passengerServiceKey = "praticPassengerService"
     /// The engine currently putting state into the world.
     private(set) var engine: (any MetroBackendEngine)? = nil
     private weak var world: MetroWorld?
@@ -168,22 +181,27 @@ extension PraticNetwork {
     /// runs every scan for every train, and `mutate`'s immediate peer
     /// push would flood the wire (the 10 Hz rebroadcast carries it), the
     /// same reasoning as the ZC pass's direct MA write. Operator-input
-    /// fields (FU latch, mode, manual setpoint, doors) are deliberately
-    /// NOT touched: they flow the other way, via syncIntents.
+    /// fields (FU latch, mode, manual setpoint) are deliberately NOT
+    /// touched: they flow the other way, via syncIntents. Doors are only
+    /// written on a station dwell's open/close edges.
     func project(_ train: PraticTrain, into world: MetroWorld) {
+        // Next stop for the panel: the station being braked for, or the
+        // one the train is standing at while it dwells.
+        let stationId = train.nextStationId ?? (train.isDwelling ? train.lastServicedStationId : nil)
+        let stationName = stationId.map { world.stationName(id: $0) }
         if let idx = world.trains.firstIndex(where: { $0.id == train.id }) {
-            fill(&world.trains[idx], from: train)
+            fill(&world.trains[idx], from: train, stationName: stationName)
         } else {
             var mirror = Train(id: train.id, label: train.label,
                                ownerPeerId: world.localPeerId,
                                position: train.position)
             mirror.passengerCount = 0
-            fill(&mirror, from: train)
+            fill(&mirror, from: train, stationName: stationName)
             world.upsert(mirror)
         }
     }
 
-    private func fill(_ mirror: inout Train, from train: PraticTrain) {
+    private func fill(_ mirror: inout Train, from train: PraticTrain, stationName: String?) {
         // The PRATIC domain model carries no acceleration or electrical
         // telemetry, so the TCMS rows (traction current/torque, the
         // motoring/braking flags) would sit at zero. Estimate the
@@ -200,8 +218,26 @@ extension PraticNetwork {
         mirror.distanceToMA = distanceAhead(from: train, to: train.maLimit)
         mirror.consigneVitesse = train.consigne
         mirror.speedError = train.consigne - train.speed
+        // Station dwell. The doors are an operator input on the mirror,
+        // so they are driven only on the dwell's open/close transitions
+        // -- a hardware train (never dwelling here) keeps whatever the
+        // operator commanded.
+        if train.isDwelling != mirror.isDwelling {
+            mirror.doorsOpen = train.isDwelling
+        }
+        mirror.isDwelling = train.isDwelling
+        mirror.dwellRemaining = train.dwellRemaining
+        mirror.lastServicedStationId = train.lastServicedStationId
+        mirror.nextStationName = stationName ?? "..."
+        mirror.passengerCount = train.passengerCount
+        mirror.paxBoarding = train.paxBoarding
+        mirror.paxAlighting = train.paxAlighting
+        mirror.paxRemaining = train.paxRemaining
+        mirror.lastPaxChange = train.paxBoarding - train.paxAlighting
         if train.emergencyStopped {
             mirror.status = .emergency
+        } else if train.isDwelling {
+            mirror.status = .docked
         } else {
             mirror.status = train.speed > 0.05 ? .moving : .stopped
         }

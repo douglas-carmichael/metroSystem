@@ -1184,6 +1184,14 @@ extension HelpLibrary {
                /RESTORE=COMMS:train | /RESTORE=SENSOR:station
                /TRANSPORT={JSONL|SERIAL} /HOST=h /PORT=n
                /CONNECT /DISCONNECT
+               /SIMULATION={PASSENGER|TEST}
+
+  /SIMULATION selects the PRATIC_SIM mode. PASSENGER serves the
+  stations: each train brakes onto the stop marker, opens its doors,
+  dwells and exchanges passengers, then departs. TEST (the default) is
+  the bare CBTC bench: empty trains running on the movement authority
+  alone. The mode persists across backend switches and relaunches, and
+  may be set before SET BACKEND PRATIC_SIM.
 
   Example -- exercise a delocalization and recover it:
 

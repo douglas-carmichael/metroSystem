@@ -272,6 +272,9 @@ enum Strings {
         add("line.sp.interval",     "HEADWAY",                             "INTERVALLE")
         add("line.sp.engage",       "ENGAGE",                              "ENGAGER")
         add("line.sp.clear",        "CLEAR",                               "LEVER")
+        add("line.sim.label",       "PRATIC SIMULATION",                   "SIMULATION PRATIC")
+        add("line.sim.passenger",   "PASSENGER SERVICE",                   "SERVICE VOYAGEURS")
+        add("line.sim.test",        "TEST BENCH",                          "BANC D'ESSAI")
         add("line.sp.active",       "Temp service active: %@ <-> %@  (headway %d s)",
                                     "SP actif : %@ <-> %@  (intervalle %d s)")
 
@@ -660,8 +663,8 @@ enum Strings {
                                     "RÉSEAU PRATIC -- image CBTC à canton mobile")
         add("pratic.notactive",     "No PRATIC backend active -- SET BACKEND PRATIC_SIM or PRATIC_HW first.",
                                     "Aucun moteur PRATIC actif -- SET BACKEND PRATIC_SIM ou PRATIC_HW d'abord.")
-        add("pratic.trains.header", "Train   Position   Seg     Speed/Cmd       MA      Link      Confidence    ±Unc",
-                                    "Rame    Position   Seg     Vitesse/Cons    AM      Liaison   Confiance     ±Inc")
+        add("pratic.trains.header", "Train   Position   Seg     Speed/Cmd       MA      Pax      Link        Confidence     ±Unc",
+                                    "Rame    Position   Seg     Vitesse/Cons    AM      Voy.     Liaison     Confiance      ±Inc")
         add("pratic.trains.none",   "no trains reported yet",              "aucune rame signalée pour l'instant")
         add("pratic.wayside.header","Wayside sensor stations:",            "Stations de détection au sol :")
         add("pratic.wayside.ok",    "OK",                                  "OK")
@@ -674,8 +677,9 @@ enum Strings {
         add("pratic.turnout.locked","LOCKED",                              "VERROUILLÉ")
         add("pratic.balises",       "%d balises (canton-entry reference points)",
                                     "%d balises (points de référence en entrée de canton)")
-        add("pratic.hint",          "SET PRATIC /MA= /TARGET= /RELOCALIZE= /TURNOUT= /INJECT= -- see HELP SET PRATIC",
-                                    "SET PRATIC /MA= /TARGET= /RELOCALIZE= /TURNOUT= /INJECT= -- voir HELP SET PRATIC")
+        add("pratic.hint",          "SET PRATIC /MA= /TARGET= /RELOCALIZE= /TURNOUT= /INJECT= /SIMULATION= -- see HELP SET PRATIC",
+                                    "SET PRATIC /MA= /TARGET= /RELOCALIZE= /TURNOUT= /INJECT= /SIMULATION= -- voir HELP SET PRATIC")
+        add("pratic.sim.mode",      "Simulation mode: %@",                 "Mode de simulation : %@")
         add("pratic.link.ok",       "OK",                                  "OK")
         add("pratic.link.degraded", "DEGRADED",                            "DÉGRADÉE")
         add("pratic.link.lost",     "LOST",                                "PERDUE")
@@ -712,6 +716,14 @@ enum Strings {
                                     "Transport indisponible sur ce moteur (ou type inconnu).")
         add("pratic.set.connect",   "Transport connecting ...",            "Connexion du transport ...")
         add("pratic.set.disconnect","Transport disconnected.",             "Transport déconnecté.")
+        add("pratic.set.sim.passenger","Simulation mode PASSENGER: trains stop at the stations and exchange passengers.",
+                                    "Mode de simulation PASSENGER : les rames desservent les stations et échangent des voyageurs.")
+        add("pratic.set.sim.test",  "Simulation mode TEST: trains run on the movement authority alone, empty.",
+                                    "Mode de simulation TEST : les rames circulent à vide sur la seule autorisation de mouvement.")
+        add("pratic.set.sim.usage", "Usage: /SIMULATION=PASSENGER or /SIMULATION=TEST",
+                                    "Usage : /SIMULATION=PASSENGER ou /SIMULATION=TEST")
+        add("pratic.set.sim.unsup", "The simulation mode applies to the PRATIC_SIM backend only.",
+                                    "Le mode de simulation ne s'applique qu'au moteur PRATIC_SIM.")
         add("pratic.set.missqual",  "Missing qualifier -- see HELP SET PRATIC.",
                                     "Qualificatif manquant -- voir HELP SET PRATIC.")
 

@@ -72,6 +72,30 @@ projection. On link loss the simulated autopilot brakes to a stand (the
 real MA-timeout behaviour), so the last-known position the PCC shows
 stays honest while the uncertainty region conveys the doubt.
 
+### Simulation mode — `SET PRATIC /SIMULATION=PASSENGER|TEST`
+
+`TEST` (the default) is the bare CBTC bench: empty trains running on
+the movement authority alone. `PASSENGER` gives a revenue-service
+picture for demos and video: in auto mode the autopilot serves the
+stations (`Sim.stationLayout`, restricted to the SP section when one is
+active). The nearest unserved stop marker inside
+`Sim.stationApproachWindow` caps the braking curve. There is no MA
+margin, because the marker is a target, not an obstacle. The train halts
+within `Sim.stationStopTolerance`, opens its doors and dwells
+`Sim.dwellMin…dwellMax` s while passengers alight and board, then
+departs. The exchange model is the VAL/CBTC_SIM one (`Sim.paxAlightMax`,
+`Sim.paxBoardMax`, capped at `Sim.paxCapacity`). The dwell freezes under
+FU, service off or a link fault. Manual driving has no automatic stops,
+and switching to TEST ends any dwell and empties the trains.
+
+The mirror shows the doors, the `docked` status, the next stop and the
+load. The doors are written only when a dwell opens or closes, so
+operator door commands still hold. The mode is stored in UserDefaults
+(`praticPassengerService`), so it survives backend switches and
+relaunches. `SHOW PRATIC` displays it, and `-praticPassengerService YES`
+on the launch command line forces it on. It is refused under
+`PRATIC_HW`: real trains run their own stopping program.
+
 Exercise the failure modes from the terminal:
 
 ```
