@@ -39,6 +39,7 @@ extension DCLEngine {
         switch true {
         case matches(subverb, "SHOW"):           return valcpShow(inner)
         case matches(subverb, "SET"):            return valcpSet(inner)
+        case matches(subverb, "MONITOR", min: 3): return valcpMonitor(inner)
         case matches(subverb, "HELP"):           return valcpHelp()
         default:
             fail("DCL-W-IVKEYW", "%X00038088")

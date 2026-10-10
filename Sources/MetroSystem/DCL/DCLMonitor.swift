@@ -9,7 +9,7 @@ extension DCLEngine {
             interval = n
         }
         if dryRun {
-            return "%MONITOR-S-START, would start MONITOR \(cls) /INTERVAL=\(Int(interval)) (dry-run)\n"
+            return "%MONITOR-S-START, would start MONITOR \(cls) /INTERVAL=\(formatInterval(interval)) (dry-run)\n"
         }
         startMonitor(class: cls, interval: interval)
         return ""
@@ -66,8 +66,9 @@ extension DCLEngine {
     }
 
     /// Stops whichever live-screen mode is active. Ctrl-Y in the DCL window
-    /// triggers this.
-    func stopMonitor(interrupt: Bool = true) {
+    /// triggers this; `exitKey` marks a Ctrl/Z exit from a layered-product
+    /// screen, which reports a normal completion instead of an interrupt.
+    func stopMonitor(interrupt: Bool = true, exitKey: Bool = false) {
         guard liveActive else { return }
         // Ctrl/Y over a DCLix DECforms panel closes the panel and returns
         // to the prompt; the panel owns its own alternate-screen state.
@@ -80,6 +81,7 @@ extension DCLEngine {
         liveTimer = nil
         let wasTest: Bool
         if case .testUtility = liveMode { wasTest = true } else { wasTest = false }
+        let wasValcp = isValcpLineMonitorActive
         liveMode = .none
 
         // If the test was launched from the DIAGNOSE menu, pop back to
@@ -94,10 +96,20 @@ extension DCLEngine {
             return
         }
 
+        if wasValcp {
+            // Restore the cursor the SMG screen hid.
+            outRaw("\u{1B}[?25h")
+            valcpScreenRows = []
+        }
         exitLiveScreen()
+        if exitKey && wasValcp {
+            out(tr("valcp.mon.exit"))
+        }
         if interrupt {
             if wasTest {
                 out("%RUN-I-ABORTED, diagnostic was interrupted by Ctrl/Y\n")
+            } else if wasValcp {
+                out(tr("valcp.mon.interrupt"))
             } else {
                 out("%MONITOR-I-INTERRUPT, request was interrupted by Ctrl/Y\n")
             }
@@ -108,11 +120,16 @@ extension DCLEngine {
     func refreshLiveDisplay() {
         let now = Date()
         let elapsed = uptimeString(from: monitorStartedAt, to: now)
-        let body = renderMonitor(monitorClass)
-        var s = body
+        if monitorClass == Self.valcpLineMonitorClass {
+            // The VALCP line monitor is a layered-product SMG$ pasteboard,
+            // not a MONITOR class: it paints its own rows incrementally.
+            valcpPaint(valcpLineMonitorRows(elapsed: elapsed))
+            return
+        }
+        var s = renderMonitor(monitorClass)
         s += "\n" + String(repeating: "-", count: 76) + "\n"
         s += "  From: \(stamp(monitorStartedAt))   To: \(stamp(now))\n"
-        s += "  Elapsed: \(elapsed)   Interval: \(Int(monitorIntervalSec))s\n"
+        s += "  Elapsed: \(elapsed)   Interval: \(formatInterval(monitorIntervalSec))s\n"
         s += "  Press  Ctrl/Y  or  ESC ESC  to interrupt and return to the DCL prompt.\n"
         // Full clear (CSI 2 J) + home (CSI H) before each frame is what
         // real SMG$ emits and is the only sequence that reliably wipes
@@ -123,6 +140,11 @@ extension DCLEngine {
         // CSI 0 m resets any leftover SGR before the clear so reverse-
         // video erase cells don't bleed into the new frame.
         outRaw("\u{1B}[0m\u{1B}[2J\u{1B}[H" + s.replacingOccurrences(of: "\n", with: "\r\n"))
+    }
+
+    /// Whole seconds print as "3", sub-second intervals as "0.5".
+    func formatInterval(_ t: TimeInterval) -> String {
+        t == t.rounded() ? String(Int(t)) : String(format: "%g", t)
     }
 
     /// Enter the VT220/320 alternate screen buffer so a continuous-monitor

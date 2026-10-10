@@ -524,6 +524,7 @@ enum Strings {
                                     "LIMITES  V %.1f m/s · accél %.2f m/s² · frein de service %.2f m/s² · FU %.2f m/s²")
         add("dynamics.refresh",     "Sampling every 500 ms",               "Échantillonnage toutes les 500 ms")
 
+
         // Modbus legend (PCC overlay + SHOW MODBUS).
         add("modbus.legend.title",  "MODBUS TCP REGISTER MAP",             "CARTE DES REGISTRES MODBUS TCP")
         add("modbus.legend.endpoint","Endpoint: localhost port 5020 · unit-id ignored · FC 01/02/03/04/05/06/0F/10",
@@ -786,14 +787,49 @@ enum Strings {
                                     "SERVICE PROVISOIRE (section restreinte EN 62290)")
 
         // VALCP layered product.
-        add("valcp.synopsis",       "VALCP -- LPD VAL Control Program.  Usage: VALCP {SHOW|SET|HELP} <object>",
-                                    "VALCP -- programme de contrôle LPD VAL.  Usage : VALCP {SHOW|SET|HELP} <objet>")
-        add("valcp.help.body",      "  SHOW: RAME [label] | RAMES | LIGNE | STATIONS | PAX\n  SET:  RAME <label> /qualifiers   |   LIGNE /qualifiers\n  See HELP VALCP in the DCL shell for the full reference.",
-                                    "  SHOW : RAME [label] | RAMES | LIGNE | STATIONS | PAX\n  SET :  RAME <label> /qualificatifs   |   LIGNE /qualificatifs\n  Voir HELP VALCP dans le shell DCL pour la référence complète.")
-        add("valcp.err.ivverb",     "%%VALCP-W-IVVERB, unknown subcommand \\%@\\ (SHOW, SET or HELP)\n",
-                                    "%%VALCP-W-IVVERB, sous-commande inconnue \\%@\\ (SHOW, SET ou HELP)\n")
+        add("valcp.synopsis",       "VALCP -- LPD VAL Control Program.  Usage: VALCP {SHOW|SET|MONITOR|HELP} <object>",
+                                    "VALCP -- programme de contrôle LPD VAL.  Usage : VALCP {SHOW|SET|MONITOR|HELP} <objet>")
+        add("valcp.help.body",      "  SHOW: RAME [label] | RAMES | LIGNE | STATIONS | PAX\n  SET:  RAME <label> /qualifiers   |   LIGNE /qualifiers\n  MONITOR: LINE [/INTERVAL=seconds]\n  See HELP VALCP in the DCL shell for the full reference.",
+                                    "  SHOW : RAME [label] | RAMES | LIGNE | STATIONS | PAX\n  SET :  RAME <label> /qualificatifs   |   LIGNE /qualificatifs\n  MONITOR : LIGNE [/INTERVAL=secondes]\n  Voir HELP VALCP dans le shell DCL pour la référence complète.")
+        add("valcp.err.ivverb",     "%%VALCP-W-IVVERB, unknown subcommand \\%@\\ (SHOW, SET, MONITOR or HELP)\n",
+                                    "%%VALCP-W-IVVERB, sous-commande inconnue \\%@\\ (SHOW, SET, MONITOR ou HELP)\n")
         add("valcp.err.show.missqual","%VALCP-W-MISSKEYW, usage: VALCP SHOW {RAME|RAMES|LIGNE|STATIONS|PAX}\n",
                                     "%VALCP-W-MISSKEYW, usage : VALCP SHOW {RAME|RAMES|LIGNE|STATIONS|PAX}\n")
+        // VALCP MONITOR -- the VAL-CTRL line monitor screen.
+        add("valcp.err.mon.missqual","%VALCP-W-MISSKEYW, usage: VALCP MONITOR LINE [/INTERVAL=seconds]\n",
+                                    "%VALCP-W-MISSKEYW, usage : VALCP MONITOR LIGNE [/INTERVAL=secondes]\n")
+        add("valcp.err.mon.ivkeyw", "%%VALCP-W-IVKEYW, unknown MONITOR object \\%@\\\n",
+                                    "%%VALCP-W-IVKEYW, objet MONITOR inconnu \\%@\\\n")
+        add("valcp.err.mon.interval","%%VALCP-W-IVINTERVAL, invalid interval \\%@\\ (0.25 second minimum)\n",
+                                    "%%VALCP-W-IVINTERVAL, intervalle invalide \\%@\\ (minimum 0,25 seconde)\n")
+        add("valcp.mon.dryrun",     "%%VALCP-S-MONSTART, would start the line monitor /INTERVAL=%@ (dry-run)\n",
+                                    "%%VALCP-S-MONSTART, démarrerait le moniteur de ligne /INTERVAL=%@ (essai à blanc)\n")
+        add("valcp.mon.exit",       "%VALCP-I-MONEXIT, line monitor exited\n",
+                                    "%VALCP-I-MONEXIT, sortie du moniteur de ligne\n")
+        add("valcp.mon.interrupt",  "%VALCP-W-INTERRUPT, line monitor interrupted by CTRL/Y\n",
+                                    "%VALCP-W-INTERRUPT, moniteur de ligne interrompu par CTRL/Y\n")
+        add("valcp.mon.title",      "LINE MONITOR",                        "MONITEUR DE LIGNE")
+        add("valcp.mon.node",       "Node %@",                             "Nœud %@")
+        add("valcp.mon.status",     "Mode: %@   Backend: %@   Trains: %d", "Mode : %@   Moteur : %@   Rames : %d")
+        add("valcp.mon.mode.normal","NORMAL (ATO)",                        "NORMAL (CAI)")
+        add("valcp.mon.block.short","B%d",                                 "C%d")
+        // SMG$LABEL_BORDER labels of the three virtual displays.
+        add("valcp.mon.lbl.line",   "Line 1",                              "Ligne 1")
+        add("valcp.mon.lbl.alarms", "Alarms  %d active, %d unacknowledged", "Alarmes  %d actives, %d non acquittées")
+        add("valcp.mon.lbl.trains", "Trains (%d)",                         "Rames (%d)")
+        add("valcp.mon.lbl.trains.part","Trains (%d of %d)",               "Rames (%d sur %d)")
+        add("valcp.mon.noalarm",    "No active alarms",                    "Aucune alarme active")
+        add("valcp.mon.col.train",  "TRAIN",                               "RAME")
+        add("valcp.mon.col.prog",   "PROG",                                "PROG")
+        add("valcp.mon.col.speed",  "SPEED km/h",                          "VITESSE km/h")
+        add("valcp.mon.col.setpt",  "SETPT",                               "CONS.")
+        add("valcp.mon.col.limit",  "LIMIT m",                             "LIMITE m")
+        add("valcp.mon.col.block",  "BLOCK",                               "CANTON")
+        add("valcp.mon.col.next",   "NEXT STOP",                           "PROCH. GARE")
+        add("valcp.mon.col.state",  "STATE",                               "ÉTAT")
+        add("valcp.mon.keys",       "Ctrl/Z Exit   Ctrl/W Refresh",        "Ctrl/Z Quitter   Ctrl/W Rafraîchir")
+        add("valcp.mon.interval",   "Interval %@ s",                       "Intervalle %@ s")
+        add("valcp.mon.elapsed",    "Elapsed %@",                          "Durée %@")
         add("valcp.err.show.ivkeyw","%%VALCP-W-IVKEYW, unknown SHOW object \\%@\\\n",
                                     "%%VALCP-W-IVKEYW, objet SHOW inconnu \\%@\\\n")
         add("valcp.err.set.missqual","%VALCP-W-MISSKEYW, usage: VALCP SET {RAME|LIGNE} ...\n",

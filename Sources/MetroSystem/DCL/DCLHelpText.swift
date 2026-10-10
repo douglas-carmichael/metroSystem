@@ -690,6 +690,35 @@ extension HelpLibrary {
   throw while any rame occupies the zone. SHOW LINE lists the switch
   table.
 
+2 MONITOR
+  Paints a continuously updated, full-screen VAL-CTRL display. VALCP
+  owns this screen itself -- it is not a class of the $OSTITLE$ Monitor
+  Utility.
+
+  Format:
+
+    VALCP MONITOR object [/INTERVAL=seconds]
+
+3 LIGNE
+  The live line monitor: a mimic board of the loop. Each rame is drawn
+  as its number moving along the track, occupied cantons light up in
+  reverse video between the rails, and the switch zones show NORMAL
+  (a plain crossing) or REVERSE (highlighted), alternating while the
+  points are in motion. Below the board are the most severe active
+  alarm (flashing while unacknowledged) and a per-rame table of speed
+  program, speed bar, consigne, limit, canton, next stop and state.
+  LINE is the EN spelling; the object follows the session language.
+
+    VALCP MONITOR LIGNE [/INTERVAL=seconds]
+
+  The screen refreshes every 0.5 second by default; /INTERVAL accepts
+  values down to 0.25. Keys, as on any SMG layered-product screen:
+
+    CTRL/Z   Exit the monitor (%VALCP-I-MONEXIT)
+    CTRL/W   Repaint the screen
+    CTRL/Y   Interrupt and return to the DCL prompt (ESC ESC over
+             telnet when the local tty eats CTRL/Y or CTRL/Z)
+
 2 HELP
   Displays the detailed VALCP command reference.
 

@@ -130,12 +130,20 @@ final class LineDiscipline {
                 }
                 dirty = false
             case 0x1A:
-                // CTRL/Z ends a MAIL message body, exits the HELP browser,
-                // and is harmless elsewhere.
-                if dcl.mailComposingBody {
+                // CTRL/Z ends a MAIL message body, exits the HELP browser
+                // and the VALCP line monitor, and is harmless elsewhere.
+                if dcl.isValcpLineMonitorActive {
+                    dcl.stopMonitor(interrupt: false, exitKey: true)
+                } else if dcl.mailComposingBody {
                     endMailBody()
                 } else if dcl.helpActive {
                     exitHelp()
+                }
+                dirty = false
+            case 0x17:
+                // CTRL/W repaints an SMG layered-product screen.
+                if dcl.isValcpLineMonitorActive {
+                    dcl.valcpRepaint()
                 }
                 dirty = false
             case 0x15:

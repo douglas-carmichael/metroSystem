@@ -262,6 +262,9 @@ final class DCLEngine: ObservableObject {
     /// every Train just for the LPD monitor utility.
     var lastDynamicsVelocity: [UUID: Double] = [:]
     var lastDynamicsSampleAt: Date = Date()
+    /// Rows last painted by the VALCP line monitor's SMG pasteboard, so
+    /// each refresh rewrites only the rows that changed.
+    var valcpScreenRows: [String] = []
 
     var bootTime: Date { host.bootDate }
 
