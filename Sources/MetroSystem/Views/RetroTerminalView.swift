@@ -541,6 +541,12 @@ final class RetroTerminalView: NSView {
         let origin = screenOrigin
         ctx.translateBy(x: origin.x, y: origin.y)
         ctx.scaleBy(x: screenScale, y: screenScale)
+        // In this flipped view NSAttributedString.draw(at:) takes the
+        // point as the line's TOP, so drawing at rowTop + glyphBaseline
+        // lands each row glyphBaseline below its cell. The primary screen
+        // absorbs that in its spare bottom row; the fixed 80 x 24 alt
+        // screen has none, so shift it back up or row 24 is clipped.
+        if inAltBuffer { ctx.translateBy(x: 0, y: -glyphBaseline) }
 
         // Build a single attributed string per row and render in one
         // shot. The fixed-pitch font keeps the column math trivial.
