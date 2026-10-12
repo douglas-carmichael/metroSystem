@@ -87,9 +87,11 @@ the ones it applied when the stop ends.
 ## Traffic
 
 Five times a second, every cab this node runs on the loop is told where every
-other rame is — this node's, its peers', other cabs' — with its number, speed
-and sense of travel. The cab draws them in its chase and cab views and on its
-map, and carries them forward between reports. On the cab this is display
+other rame is — this node's automated rames (whichever backend runs them:
+VAL, CBTC or PRATIC, all mirrored into MetroWorld), its peers', other cabs' —
+with its number, speed and sense of travel. The cab draws them in its chase
+and cab views (with a beacon when far off) and on its map, lists the nearest
+ahead and behind with the gap, and carries them forward between reports. On the cab this is display
 only: the stopping point is what keeps it clear.
 
 ## Telemetry
