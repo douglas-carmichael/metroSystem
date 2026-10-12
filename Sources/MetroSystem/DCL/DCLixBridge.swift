@@ -149,12 +149,12 @@ extension DCLEngine: @preconcurrency DCLixHost, @preconcurrency DCLixLocalizing 
             return ["ALARMS", "AUDIT", "BACKEND", "CLUSTER", "CONNECTIONS", "CPU",
                     "DEFAULT", "DEVICES", "DIAGNOSTICS", "ERROR", "HARDWARE",
                     "INTRUSION", "LICENSE", "LOGICAL", "MEMORY", "MODBUS", "NETWORK",
-                    "PAX", "PRATIC", "PROCESS", "PROTECTION", "QUOTA", "RAME",
+                    "PAX", "PRATIC", "PROCESS", "PROTECTION", "PUPITRE", "QUOTA", "RAME",
                     "RAMES", "STATIONS", "STATUS", "SYMBOL", "SYSTEM", "TERMINAL",
                     "TIME", "USERS", "VERSION"]
         case "SET":
             return ["BACKEND", "DEFAULT", "HARDWARE", "NOON", "NOVERIFY", "ON",
-                    "PASSWORD", "PRATIC", "PROCESS", "PROMPT", "RAME", "STANDARD",
+                    "PASSWORD", "PRATIC", "PROCESS", "PROMPT", "PUPITRE", "RAME", "STANDARD",
                     "TERMINAL", "VERIFY"]
         default:
             return []

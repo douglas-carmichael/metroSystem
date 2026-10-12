@@ -18,6 +18,7 @@ extension DCLEngine {
         case matches(what, "HARDWARE",    min: 4): return showHardware()
         case matches(what, "BACKEND",     min: 4): return showBackend()
         case matches(what, "PRATIC",      min: 4): return showPratic()
+        case matches(what, "PUPITRE",     min: 4): return showPupitre()
         case matches(what, "TIME"):                return showTime()
         case matches(what, "NETWORK",     min: 3): return showNetwork()
         case matches(what, "RAMES",       min: 4): return showFleet()

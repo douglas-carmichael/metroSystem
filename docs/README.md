@@ -49,3 +49,6 @@ shipped English-only); the layered-product content localizes.
 - [Modbus TCP register map](modbus-register-map.md) — the full coil /
   discrete-input / holding-register / input-register layout the app exposes
   on `localhost:5020`.
+- [Pupitre link](pupitre-link.md) — metroSystem as the PCC of VALPupitreSim
+  cabs: discovery, the line it lends them, protection, traffic and
+  `SHOW`/`SET PUPITRE`.

@@ -29,11 +29,12 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_metrosys._tcp</string>
+		<string>_valpupitre._tcp</string>
 	</array>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Discover other PCC nodes and ClusterDaemon peers on your local network via Bonjour.</string>
+	<string>Discover other PCC nodes, ClusterDaemon peers and VALPupitreSim cabs on your local network via Bonjour.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSQuitAlwaysKeepsWindows</key>
