@@ -110,7 +110,8 @@ extension DCLEngine {
         if t.isEnrayage    { faults.append(tr("fault.enrayage")) }
         if t.isEmergencyBrakeApplied { faults.append(tr("btn.fu")) }
         let faultStr = faults.isEmpty ? tr("valcp.rame.nofault") : faults.joined(separator: ", ")
-        let ownerKey = world.canControl(t) ? "valcp.owner.local" : "valcp.owner.remote"
+        let ownerKey = world.canControl(t) ? "valcp.owner.local"
+            : PupitreLink.isCabOwner(t.ownerPeerId) ? "valcp.owner.cab" : "valcp.owner.remote"
 
         var s = String(format: tr("valcp.rame.title"), t.label, stamp(Date()))
         s += String(format: "%@%8.1f m   (%@)\n", tr("valcp.rame.position"), t.position, cantonName)

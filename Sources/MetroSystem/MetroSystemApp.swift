@@ -112,6 +112,8 @@ struct MetroSystemApp: App {
         // Backend selection (VAL / PRATIC_SIM / PRATIC_HW): attaching
         // starts the default VALSimBackend against the seeded fleet.
         BackendManager.shared.attach(world: world)
+        // VALPupitreSim cabs: discovered over Bonjour, driven as their PCC.
+        PupitreLink.shared.attach(world: world)
     }
 
     /// Looks for another running MetroSystem process on this Mac. A second

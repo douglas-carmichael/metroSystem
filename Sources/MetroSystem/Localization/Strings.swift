@@ -34,7 +34,7 @@ enum Strings {
         "alarm.msg.platform", "alarm.msg.display", "alarm.msg.switch",
         "alarm.msg.hwlink",
         "alarm.msg.deloc", "alarm.msg.comms", "alarm.msg.wayside",
-        "alarm.msg.pratictransport",
+        "alarm.msg.pratictransport", "alarm.msg.pupitre",
     ]
 
     private static func buildTable() -> [String: [Lang: String]] {
@@ -359,6 +359,8 @@ enum Strings {
                                     "Défaut station de détection au sol")
         add("alarm.msg.pratictransport", "PRATIC telemetry transport down",
                                     "Transport de télémesure PRATIC coupé")
+        add("alarm.msg.pupitre",    "Cab link lost -- rame held on the line at its last known position",
+                                    "Liaison pupitre perdue -- rame maintenue sur la ligne à sa dernière position connue")
         add("alarm.msg.power",      "750 V traction supply fault",
                                     "Défaut alimentation traction 750 V")
         add("alarm.msg.track",      "Track-circuit inconsistency reported",
@@ -374,6 +376,7 @@ enum Strings {
         add("train.rame",           "TRAIN",                               "RAME")
         add("train.tag.local",      "LOCAL",                               "LOCALE")
         add("train.tag.remote",     "REMOTE",                              "DISTANTE")
+        add("train.tag.cab",        "CAB",                                 "PUPITRE")
         add("train.mode.cai",       "ATO",                                 "CAI")
         add("train.mode.cml",       "MAN",                                 "CML")
         add("train.canton",         "BLOCK",                               "CANTON")
@@ -638,6 +641,54 @@ enum Strings {
         add("hardware.set.missqual","Missing qualifier -- see HELP SET HARDWARE.",
                                     "Qualificatif manquant -- voir HELP SET HARDWARE.")
 
+        // Pupitre link to VALPupitreSim cabs (SHOW PUPITRE / SET PUPITRE).
+        add("cablink.title",        "CAB LINK -- VALPUPITRESIM CABS UNDER THIS PCC",
+                                    "LIAISON PUPITRES -- PUPITRES VALPUPITRESIM DE CE PCC")
+        add("cablink.discovery",    "Discovery: %@ -- %@",                 "Découverte : %@ -- %@")
+        add("cablink.discovery.stopped","STOPPED",                         "ARRÊTÉE")
+        add("cablink.discovery.browsing","BROWSING",                       "EN COURS")
+        add("cablink.discovery.failed","FAILED (%@)",                      "EN DÉFAUT (%@)")
+        add("cablink.line",         "Line lent to cabs: %@ (%@) -- %.0f m loop, %d stations, %d blocks",
+                                    "Ligne prêtée aux pupitres : %@ (%@) -- boucle de %.0f m, %d stations, %d cantons")
+        add("cablink.addresses",    "Fixed addresses:",                    "Adresses fixes :")
+        add("cablink.none",         "No cab found -- start VALPupitreSim on this network, or SET PUPITRE /ADD=(host,port).",
+                                    "Aucun pupitre trouvé -- lancez VALPupitreSim sur ce réseau, ou SET PUPITRE /ADD=(hôte,port).")
+        add("cablink.via.bonjour",  "[BONJOUR]",                           "[BONJOUR]")
+        add("cablink.via.address",  "[FIXED ADDRESS]",                     "[ADRESSE FIXE]")
+        add("cablink.link",         "Link",                                "Liaison")
+        add("cablink.state.connecting","CONNECTING",                       "CONNEXION")
+        add("cablink.state.ready",  "READY",                               "PRÊTE")
+        add("cablink.state.down",   "DOWN",                                "COUPÉE")
+        add("cablink.command",      "Command",                             "Commande")
+        add("cablink.cmd.local",    "LOCAL",                               "LOCALE")
+        add("cablink.cmd.pcc",      "PCC",                                 "PCC")
+        add("cablink.control",      "Control",                             "Contrôle")
+        add("cablink.ctl.here",     "THIS NODE",                           "CE NŒUD")
+        add("cablink.online",       "Line",                                "Ligne")
+        add("cablink.line.on",      "ON THIS LINE",                        "SUR CETTE LIGNE")
+        add("cablink.line.test",    "OWN TEST TRACK",                      "SA VOIE D'ESSAI")
+        add("cablink.line.other",   "OTHER LINE (%@)",                     "AUTRE LIGNE (%@)")
+        add("cablink.stoppoint",    "stop point %.0f m",                   "point d'arrêt %.0f m")
+        add("cablink.refusal",      "Last refusal: %@",                    "Dernier refus : %@")
+        add("cablink.hint",         "SET PUPITRE rame /ACQUIRE [/FORCE] | /RELEASE -- SET PUPITRE /ADD=(host,port) | /REMOVE=(host,port)",
+                                    "SET PUPITRE rame /ACQUIRE [/FORCE] | /RELEASE -- SET PUPITRE /ADD=(hôte,port) | /REMOVE=(hôte,port)")
+        add("cablink.set.add",      "Cab address %@ port %d added; connecting ...",
+                                    "Adresse de pupitre %@ port %d ajoutée ; connexion ...")
+        add("cablink.set.remove",   "Cab address %@ port %d removed.",     "Adresse de pupitre %@ port %d supprimée.")
+        add("cablink.set.address.bad","Usage: /ADD=(host[,port]) or /REMOVE=(host[,port]) -- the port defaults to 5206, and an address is added once.",
+                                    "Usage : /ADD=(hôte[,port]) ou /REMOVE=(hôte[,port]) -- le port par défaut est 5206, et une adresse ne s'ajoute qu'une fois.")
+        add("cablink.set.acquire",  "Control of rame %@ requested.",       "Contrôle de la rame %@ demandé.")
+        add("cablink.set.force",    "Control of rame %@ requested from its current PCC.",
+                                    "Contrôle de la rame %@ demandé à son PCC actuel.")
+        add("cablink.set.release",  "Rame %@ given back; this node won't take it again until /ACQUIRE.",
+                                    "Rame %@ rendue ; ce nœud ne la reprendra qu'après /ACQUIRE.")
+        add("cablink.set.nosuchcab","No connected cab presents rame %@ -- SHOW PUPITRE lists the cabs.",
+                                    "Aucun pupitre connecté ne présente la rame %@ -- SHOW PUPITRE liste les pupitres.")
+        add("cablink.set.needrame", "Name the rame: SET PUPITRE rame /ACQUIRE or /RELEASE.",
+                                    "Indiquez la rame : SET PUPITRE rame /ACQUIRE ou /RELEASE.")
+        add("cablink.set.missqual", "Missing qualifier -- see HELP SET PUPITRE.",
+                                    "Qualificatif manquant -- voir HELP SET PUPITRE.")
+
         // Backend selection (SHOW/SET BACKEND) and the PRATIC network
         // surface (SHOW/SET PRATIC).
         add("backend.title",        "STATE BACKENDS (* = active)",         "MOTEURS D'ÉTAT (* = actif)")
@@ -854,6 +905,7 @@ enum Strings {
         add("valcp.rame.owner",     "  Owner:           ",                 "  Pilotage :        ")
         add("valcp.owner.local",    "THIS NODE",                           "CE NŒUD")
         add("valcp.owner.remote",   "REMOTE NODE",                         "NŒUD DISTANT")
+        add("valcp.owner.cab",      "VALPUPITRESIM CAB",                   "PUPITRE VALPUPITRESIM")
         add("valcp.rame.pax",       "  Passengers:      %d / %d",          "  Voyageurs :       %d / %d")
         add("valcp.rame.nextstop",  "  Next stop:       ",                 "  Prochain arrêt :  ")
         add("valcp.rame.voltage",   "  Line voltage:  ",                   "  Tension ligne : ")

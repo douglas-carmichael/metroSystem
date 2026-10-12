@@ -33,7 +33,7 @@ struct PCCControlWindow: View {
                 SCADAAlarmPanel()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
-                        ForEach(world.sortedTrains) { train in
+                        ForEach(world.pccListTrains) { train in
                             TrainPanel(train: train,
                                        focused: focusedTrainId == train.id)
                         }
@@ -149,7 +149,7 @@ struct PCCControlWindow: View {
     /// locally owned, or remote with a live link to its owner. Same order
     /// the panels render in, so TAB advances visually.
     private func controllableTrains() -> [Train] {
-        world.sortedTrains.filter { network.canControl($0) }
+        world.pccListTrains.filter { network.canControl($0) }
     }
 
     private func ensureFocus() {
@@ -837,7 +837,9 @@ private struct TrainPanel: View {
 
     private var titleLine: String {
         let mode = train.mode == .auto ? language.t("train.mode.cai") : language.t("train.mode.cml")
-        let owner = isLocal ? language.t("train.tag.local") : language.t("train.tag.remote")
+        let owner = isLocal ? language.t("train.tag.local")
+            : PupitreLink.isCabOwner(train.ownerPeerId) ? language.t("train.tag.cab")
+            : language.t("train.tag.remote")
         return "\(language.t("train.rame")) \(train.label) [\(mode)] [\(owner)]"
     }
 
@@ -1415,5 +1417,16 @@ private struct ModbusLegendOverlay: View {
                 .font(RetroTheme.monoSm)
                 .foregroundColor(RetroTheme.amber)
         }
+    }
+}
+
+private extension MetroWorld {
+    /// The PCC panel order: VALPupitreSim cab rames first -- someone is at
+    /// those pupitres -- then the rest of the fleet by label. Display only:
+    /// `sortedTrains` (and with it the Modbus register indices) keeps label
+    /// order.
+    var pccListTrains: [Train] {
+        let cabs = sortedTrains.filter { PupitreLink.isCabOwner($0.ownerPeerId) }
+        return cabs + sortedTrains.filter { !PupitreLink.isCabOwner($0.ownerPeerId) }
     }
 }

@@ -49,7 +49,8 @@ targets:
         NSHighResolutionCapable: true
         NSQuitAlwaysKeepsWindows: false
         NSPrincipalClass: NSApplication
-        NSLocalNetworkUsageDescription: "Discover other PCC nodes and ClusterDaemon peers on your local network via Bonjour."
+        NSLocalNetworkUsageDescription: "Discover other PCC nodes, ClusterDaemon peers and VALPupitreSim cabs on your local network via Bonjour."
         NSBonjourServices:
           - _metrosys._tcp
+          - _valpupitre._tcp
         ATSApplicationFontsPath: "."

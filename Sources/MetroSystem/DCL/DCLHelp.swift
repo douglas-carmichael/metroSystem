@@ -278,6 +278,7 @@ extension DCLEngine {
             "SET HARDWARE /DRIVER=CONSOLE", "SET HARDWARE /DISABLE",
             "SHOW BACKEND", "SHOW PRATIC",
             "SET BACKEND VAL", "SET PRATIC",
+            "SHOW PUPITRE", "SET PUPITRE",
             "DIRECTORY", "DIRECTORY/SIZE/DATE",
             "TYPE STARTUP.COM", "TYPE EVENTLOG.LOG",
             "TYPE NOSUCHFILE.TXT",

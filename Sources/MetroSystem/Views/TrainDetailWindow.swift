@@ -114,7 +114,9 @@ private struct DetailBanner: View {
                         highlighted: language.themeKind == .iso101) {
                 language.toggleTheme()
             }
-            Text(isLocal ? language.t("train.tag.local") : language.t("train.tag.remote"))
+            Text(isLocal ? language.t("train.tag.local")
+                 : PupitreLink.isCabOwner(train.ownerPeerId) ? language.t("train.tag.cab")
+                 : language.t("train.tag.remote"))
                 .font(RetroTheme.mono)
                 .foregroundColor(RetroTheme.bg)
                 .padding(.horizontal, 6)

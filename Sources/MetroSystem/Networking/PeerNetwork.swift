@@ -306,6 +306,11 @@ final class PeerNetwork: ObservableObject {
     /// enable/disable a rame's controls.
     func canControl(_ train: Train) -> Bool {
         if train.ownerPeerId == localPeerId { return true }
+        // A VALPupitreSim cab's rame: drivable while this node holds the
+        // cab's control and the cab is under PCC command.
+        if PupitreLink.isCabOwner(train.ownerPeerId) {
+            return PupitreLink.shared.canControl(train)
+        }
         return connections[train.ownerPeerId] != nil
     }
 
@@ -318,6 +323,11 @@ final class PeerNetwork: ObservableObject {
         if train.ownerPeerId == localPeerId {
             world?.applyControl(trainId: train.id, kind: kind, value: value)
             return true
+        }
+        // A VALPupitreSim cab owns its rame: the action goes to the cab as
+        // a PCC command over the pupitre link.
+        if PupitreLink.isCabOwner(train.ownerPeerId) {
+            return PupitreLink.shared.control(train, kind, value: value)
         }
         guard let conn = connections[train.ownerPeerId] else { return false }
         conn.send(.command(TrainCommand(trainId: train.id,

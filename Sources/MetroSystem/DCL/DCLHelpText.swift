@@ -1228,6 +1228,29 @@ extension HelpLibrary {
     SHOW PRATIC                       ! watch LINK then CONFIDENCE degrade
     SET PRATIC /RELOCALIZE=(201,4)    ! re-reference against balise 4
 
+2 PUPITRE
+  Manages the pupitre link: the VALPupitreSim cabs this node finds on the
+  network (Bonjour _valpupitre._tcp, or a fixed address) and drives as
+  their PCC. The link takes control of every free cab by itself. A cab
+  whose COMMANDE selector is turned to PCC joins this node's line at the
+  station farthest from every train; its rame then appears with the
+  others and takes the usual controls (SET RAME, START, STOP, OPEN,
+  CLOSE, the panel), while the wayside gives it the stopping point 8 m
+  short of the next occupied block and the cab is shown every other rame
+  on the line. Use these qualifiers to arbitrate between PCC nodes, or to
+  reach a cab Bonjour cannot see.
+
+    SET PUPITRE rame /ACQUIRE          take control of the cab
+                     /ACQUIRE/FORCE    take it from another PCC
+                     /RELEASE          give it back (kept until /ACQUIRE)
+    SET PUPITRE /ADD=(host[,port])     reach a cab by address (port 5206)
+                /REMOVE=(host[,port])  forget that address
+
+  Example -- reach a cab on another subnet:
+
+    SET PUPITRE /ADD=(10.0.4.21,5206)
+    SHOW PUPITRE
+
 1 SHELVE
   Shelves an active SCADA alarm (ISA-18.2 SHLVD): the alarm is removed from
   the primary annunciator -- the beacon, the panel list and the active
@@ -1341,6 +1364,15 @@ extension HelpLibrary {
   balise count. Requires an active PRATIC backend (SET BACKEND).
 
     SHOW PRATIC
+
+2 PUPITRE
+  Displays the pupitre link: Bonjour discovery, the line lent to cabs,
+  and every VALPupitreSim cab found -- link state, COMMANDE position
+  (LOCAL or PCC), which PCC holds control, whether its rame is on this
+  line, position, speed, stopping point, and the cab's last refusal.
+  Configure with SET PUPITRE.
+
+    SHOW PUPITRE
 
 2 TIME
   Displays the current date and time.
