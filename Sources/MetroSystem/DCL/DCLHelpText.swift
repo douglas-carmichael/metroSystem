@@ -493,6 +493,9 @@ extension HelpLibrary {
 
     Session        SET RECALL SPAWN ATTACH LOGOUT EXIT
 
+    Utilities      VALCP MONITOR LINE, MONITOR, DIAGNOSE, RUN LRU_DIR, EDIT
+                   -- the full-screen displays; see HELP UTILITIES
+
   Short-form aliases follow the interface language: English mode accepts
   TRAIN, FLEET, LINE, STATIONS, PAX, EMERGENCY, RESUME; French mode
   accepts RAME, FLOTTE, LIGNE, GARES, PAX, URGENCE, REPRISE, AIDE.
@@ -1652,6 +1655,82 @@ extension HelpLibrary {
   Format:
 
     UNSHELVE ALARM alarm-id
+
+1 UTILITIES
+  The full-screen utilities available on this node. Each one takes over
+  the terminal (the DCL window or a telnet session on port 2323) until
+  you leave it, then returns you to the $ prompt. Type the command shown
+  at the $ prompt to start the utility.
+
+    Command                  Display
+    -----------------------  -----------------------------------------
+    VALCP MONITOR LINE       Live line mimic board, alarms, rame table
+    MONITOR DYNAMICS         Per-rame speed, consigne, MA and state
+    MONITOR class            $OSTITLE$ Monitor Utility (SYSTEM, IO, ...)
+    DIAGNOSE                 Diagnostic test menu
+    RUN test-name            One diagnostic test (FREIN_TEST, ...)
+    RUN LRU_DIR              Interactive LRU board catalogue
+    EDIT file-spec           EDT screen editor
+
+  In French mode the line monitor's object is LIGNE:
+  VALCP MONITOR LIGNE.
+
+  Leaving a utility. The keys are the same on every screen:
+
+    CTRL/Z     Exit (line monitor, LRU_DIR, EDT -- EDT saves the file)
+    CTRL/Y     Interrupt and return to the $ prompt (every display)
+    ESC ESC    Same as CTRL/Y, for telnet clients whose terminal driver
+               swallows CTRL/Y or CTRL/Z
+
+  MAIL and HELP are prompt-driven rather than full-screen: leave MAIL
+  with EXIT, and HELP with CTRL/Z or RETURN at the "Topic?" prompt.
+
+  Add /PAGE to any ordinary command to page its output instead, for
+  example  SHOW RAMES/PAGE.
+
+2 Line_Monitor
+  The VAL-CTRL live line monitor, the layered product's own SMG
+  pasteboard. It shows the loop as a mimic board: rames moving along the
+  track, occupied cantons in reverse video, the switch zones' positions,
+  the most severe active alarm, and one row per rame.
+
+    $ VALCP MONITOR LINE                 ! refresh every 0.5 s
+    $ VALCP MONITOR LINE /INTERVAL=0.25  ! the fastest refresh
+
+  CTRL/W repaints the screen; CTRL/Z exits. See HELP VALCP MONITOR LIGNE.
+
+2 Dynamics
+  The LPD class of the Monitor Utility: one row per rame with position,
+  speed and consigne, acceleration, movement authority and asservissement
+  state.
+
+    $ MONITOR DYNAMICS
+    $ MONITOR DYNAMICS /INTERVAL=1
+
+  CTRL/Y exits. See HELP MONITOR for the system classes.
+
+2 Diagnostics
+  DIAGNOSE opens a menu of the metro tests. Up and down arrows select a
+  test and RETURN runs it; when the test finishes, CTRL/Y returns you to
+  the menu, and CTRL/Y at the menu returns you to the $ prompt. RUN starts
+  a single test without the menu:
+
+    $ DIAGNOSE
+    $ RUN FREIN_TEST
+    $ RUN PORTES_TEST
+    $ RUN PNEU_CAL
+    $ RUN QUAI_LAMP_TEST
+
+  RUN LRU_LOOKUP prints its report in the scrolling terminal; it is not a
+  full-screen display. See HELP RUN.
+
+2 LRU_Directory
+  A DECforms-style catalogue of every board in the simulated VAL
+  equipment. Arrows move the selection; typing filters the list.
+
+    $ RUN LRU_DIR
+
+  CTRL/Z or ESC ESC leaves the form. See HELP RUN LRU_DIR.
 
 1 WAIT
   Suspends the procedure or the interactive session for the specified
