@@ -156,8 +156,8 @@ headers use the neutral LIMIT/LIMITE).
 
 - `Train.speedProgram` carries the received program (`SF-N`, `PP`,
   `SFA`, `SFB`, `HOLD`, `ASMD`, `ABS`) — the PCC card, the detail
-  window's ATP section, VALCP SHOW RAME, MONITOR DYNAMICS (state
-  `PERT`) and Modbus input registers 128..143 render it. It is empty
+  window's ATP section, VALCP SHOW RAME, MONITOR DYNAMICS (PROG column,
+  state PERT) and Modbus input registers 128..143 render it. It is empty
   under the other backends, which is how the views gate the VAL-specific
   rows.
 - `Train.ebCause` carries the FU trip cause while the brake is in.

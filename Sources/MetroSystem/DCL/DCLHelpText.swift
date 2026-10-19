@@ -839,7 +839,9 @@ extension HelpLibrary {
 2 DYNAMICS
   Live rame dynamics -- position, speed and consigne, acceleration,
   movement authority and asservissement state. This is an LPD extension
-  class.
+  class: it is drawn on the VAL-CTRL screen, like VALCP MONITOR LINE, in
+  the session language, refreshes every 0.5 s by default (/INTERVAL down
+  to 0.25), and CTRL/Z exits.
 
 2 ALL_CLASSES
   A concatenation of the SYSTEM, IO and STATES displays.
@@ -1677,7 +1679,8 @@ extension HelpLibrary {
 
   Leaving a utility. The keys are the same on every screen:
 
-    CTRL/Z     Exit (line monitor, LRU_DIR, EDT -- EDT saves the file)
+    CTRL/Z     Exit (line and dynamics monitors, LRU_DIR, EDT -- EDT
+               saves the file)
     CTRL/Y     Interrupt and return to the $ prompt (every display)
     ESC ESC    Same as CTRL/Y, for telnet clients whose terminal driver
                swallows CTRL/Y or CTRL/Z
@@ -1700,14 +1703,16 @@ extension HelpLibrary {
   CTRL/W repaints the screen; CTRL/Z exits. See HELP VALCP MONITOR LIGNE.
 
 2 Dynamics
-  The LPD class of the Monitor Utility: one row per rame with position,
-  speed and consigne, acceleration, movement authority and asservissement
-  state.
+  The LPD class of the Monitor Utility, drawn on the VAL-CTRL screen like
+  the line monitor: one row per rame with position, speed and consigne,
+  acceleration, movement authority and asservissement state, a bar graph
+  of speed against consigne, and the speed-profile limits.
 
-    $ MONITOR DYNAMICS
+    $ MONITOR DYNAMICS                   ! refresh every 0.5 s
     $ MONITOR DYNAMICS /INTERVAL=1
 
-  CTRL/Y exits. See HELP MONITOR for the system classes.
+  CTRL/W repaints the screen; CTRL/Z exits. See HELP MONITOR for the
+  system classes.
 
 2 Diagnostics
   DIAGNOSE opens a menu of the metro tests. Up and down arrows select a

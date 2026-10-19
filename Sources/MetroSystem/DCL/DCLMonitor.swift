@@ -4,6 +4,23 @@ import Foundation
 extension DCLEngine {
     func monitorCmd(_ cmd: Parsed) -> String {
         let cls: String = cmd.positional.first.map { resolveMonitorClass($0) } ?? "SYSTEM"
+        if cls == "DYNAMICS" {
+            // The LPD class is the layered product's own SMG screen, with
+            // the line monitor's refresh rate and interval rules.
+            var interval: TimeInterval = 0.5
+            if let raw = cmd.qualifierValue("INTERVAL") {
+                guard let n = Double(raw), n >= 0.25 else {
+                    return String(format: tr("valcp.err.mon.interval"), raw)
+                }
+                interval = n
+            }
+            if dryRun {
+                return "%MONITOR-S-START, would start MONITOR DYNAMICS /INTERVAL=\(formatInterval(interval)) (dry-run)\n"
+            }
+            guard world != nil else { return tr("valcp.cmd.noworld") }
+            startValcpDynamicsMonitor(interval: interval)
+            return ""
+        }
         var interval: TimeInterval = 3.0
         if let raw = cmd.qualifierValue("INTERVAL"), let n = Double(raw), n >= 1 {
             interval = n
@@ -45,7 +62,6 @@ extension DCLEngine {
         case "LOCK":        return monitorLock()
         case "CLUSTER":     return monitorCluster()
         case "FCP":         return monitorFCP()
-        case "DYNAMICS":    return monitorDynamics()
         case "ALL_CLASSES": return monitorSystem() + monitorIO() + monitorStates()
         default:            return monitorSystem()
         }
@@ -81,7 +97,8 @@ extension DCLEngine {
         liveTimer = nil
         let wasTest: Bool
         if case .testUtility = liveMode { wasTest = true } else { wasTest = false }
-        let wasValcp = isValcpLineMonitorActive
+        let wasValcp = isValcpScreenActive
+        let screenName = monitorClass == Self.valcpDynamicsMonitorClass ? "dyn" : "mon"
         liveMode = .none
 
         // If the test was launched from the DIAGNOSE menu, pop back to
@@ -103,13 +120,13 @@ extension DCLEngine {
         }
         exitLiveScreen()
         if exitKey && wasValcp {
-            out(tr("valcp.mon.exit"))
+            out(tr("valcp.\(screenName).exit"))
         }
         if interrupt {
             if wasTest {
                 out("%RUN-I-ABORTED, diagnostic was interrupted by Ctrl/Y\n")
             } else if wasValcp {
-                out(tr("valcp.mon.interrupt"))
+                out(tr("valcp.\(screenName).interrupt"))
             } else {
                 out("%MONITOR-I-INTERRUPT, request was interrupted by Ctrl/Y\n")
             }
@@ -124,6 +141,10 @@ extension DCLEngine {
             // The VALCP line monitor is a layered-product SMG$ pasteboard,
             // not a MONITOR class: it paints its own rows incrementally.
             valcpPaint(valcpLineMonitorRows(elapsed: elapsed))
+            return
+        }
+        if monitorClass == Self.valcpDynamicsMonitorClass {
+            valcpPaint(valcpDynamicsMonitorRows(elapsed: elapsed))
             return
         }
         var s = renderMonitor(monitorClass)
@@ -581,66 +602,5 @@ extension DCLEngine {
         s += mrow("CPU Tick Rate",                osc(4.2, 4.4) + totalDiskOps * 0.01)
         s += mrow("File Sys Page Fault Rate",     rates.pageFaultRate * 0.0004)
         return s
-    }
-
-    /// LPD layered-product monitor utility: shows the live asservissement
-    /// state for every rame on the line. Position is in metres along the
-    /// loop, speed in m/s (with the commanded consigne beside it),
-    /// acceleration in m/s² derived from the speed delta against the
-    /// previous frame, LIMIT is the distance to the enforced stop limit
-    /// (the movement authority under a moving-block backend, the encoded
-    /// program's stopping point under fixed-block VAL), and the state
-    /// column tells you which regime the speed controller is in.
-    func monitorDynamics() -> String {
-        let now = Date()
-        var s = mheader("TRAIN DYNAMICS (LPD)")
-        s += "  Train   Position     Speed / Setpoint     Accel      Limit     State\n"
-        s += "  -----   --------     ----------------     ------    -------   -----\n"
-
-        let trains = world?.sortedTrains ?? []
-        if trains.isEmpty {
-            s += "  (no trains in service)\n"
-            return s
-        }
-        let dt = max(0.001, now.timeIntervalSince(lastDynamicsSampleAt))
-        for train in trains {
-            let prevVel = lastDynamicsVelocity[train.id] ?? train.speed
-            let accel = (train.speed - prevVel) / dt
-            lastDynamicsVelocity[train.id] = train.speed
-            let state = dynamicsState(for: train)
-            s += String(format: "  %-6@ %8.1f m   %6.2f / %6.2f m/s   %+6.2f   %7.1f m   %@\n",
-                        train.label as NSString,
-                        train.position,
-                        train.speed,
-                        train.consigneVitesse,
-                        accel,
-                        train.distanceToMA,
-                        state)
-        }
-        lastDynamicsSampleAt = now
-
-        s += "\n"
-        s += String(format: "  Profile limits:  V %.1f m/s   accel %.2f m/s²   service brake %.2f   emerg brake %.2f m/s²\n",
-                    Sim.lineSpeed, Sim.maxAcceleration, Sim.nominalBraking, Sim.emergencyBraking)
-        return s
-    }
-
-    /// Firmware-side English state mnemonics -- MONITOR is in-universe VMS
-    /// system output, so these do not localize (the Dynamics window shows
-    /// the same regimes localized). Under the VAL backend the perturbed
-    /// stopping program reads PERT while it is actually slowing the rame.
-    private func dynamicsState(for train: Train) -> String {
-        if train.isEmergencyBrakeApplied || train.status == .emergency { return "EB" }
-        if train.doorsOpen { return "DWELL" }
-        if train.isDepartureHold { return "HOLD" }
-        if train.mode == .manual { return "MANUAL" }
-        if train.status == .stopped { return abs(train.speed) > 0.05 ? "STOPPING" : "IDLE" }
-        if train.speedProgram == VALSpeedProgram.perturbed.rawValue && train.speedError < -0.1 {
-            return "PERT"
-        }
-        let cruising = train.speed >= train.consigneVitesse * 0.95 && train.consigneVitesse > 0.5
-        if train.speedError < -0.3 { return "DECEL" }
-        if cruising                { return "CRUISE" }
-        return "ACCEL"
     }
 }

@@ -881,6 +881,20 @@ enum Strings {
         add("valcp.mon.keys",       "Ctrl/Z Exit   Ctrl/W Refresh",        "Ctrl/Z Quitter   Ctrl/W Rafraîchir")
         add("valcp.mon.interval",   "Interval %@ s",                       "Intervalle %@ s")
         add("valcp.mon.elapsed",    "Elapsed %@",                          "Durée %@")
+        // MONITOR DYNAMICS, drawn on the VAL-CTRL pasteboard.
+        add("valcp.dyn.exit",       "%VALCP-I-MONEXIT, dynamics monitor exited\n",
+                                    "%VALCP-I-MONEXIT, sortie du moniteur de dynamique\n")
+        add("valcp.dyn.interrupt",  "%VALCP-W-INTERRUPT, dynamics monitor interrupted by CTRL/Y\n",
+                                    "%VALCP-W-INTERRUPT, moniteur de dynamique interrompu par CTRL/Y\n")
+        add("valcp.dyn.title",      "TRAIN DYNAMICS",                      "DYNAMIQUE DES RAMES")
+        add("valcp.dyn.col.pos",    "POS. m",                              "POS. m")
+        add("valcp.dyn.col.speed",  "SPEED m/s",                           "VIT. m/s")
+        add("valcp.dyn.col.setpt",  "SETPT",                               "CONS.")
+        add("valcp.dyn.col.accel",  "ACCEL m/s²",                          "ACCÉL. m/s²")
+        add("valcp.dyn.lbl.trace",  "Speed / setpoint  0-%d m/s",          "Vitesse / consigne  0-%d m/s")
+        add("valcp.dyn.lbl.profile","Speed profile",                       "Profil de vitesse")
+        add("valcp.dyn.profile",    "Vmax %@ m/s   Accel %@ m/s²   Service brake %@ m/s²   EB %@ m/s²",
+                                    "Vmax %@ m/s   Accél. %@ m/s²   Frein service %@ m/s²   FU %@ m/s²")
         add("valcp.err.show.ivkeyw","%%VALCP-W-IVKEYW, unknown SHOW object \\%@\\\n",
                                     "%%VALCP-W-IVKEYW, objet SHOW inconnu \\%@\\\n")
         add("valcp.err.set.missqual","%VALCP-W-MISSKEYW, usage: VALCP SET {RAME|LIGNE} ...\n",

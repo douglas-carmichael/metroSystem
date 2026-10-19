@@ -14,6 +14,11 @@ import Foundation
 // exit, Ctrl/W repaint, Ctrl/Y interrupt). Like SMG$ the screen is drawn
 // once and then updated by rewriting only the rows that changed.
 //
+// MONITOR DYNAMICS uses the same pasteboard: banner and status line, a
+// TRAINS display of the asservissement figures (position, speed, setpoint,
+// acceleration, stop limit, regime), a speed-vs-setpoint bar graph and the
+// profile limits.
+//
 // VALCP output is localised (the vendor is French); the `%VALCP-x-IDENT`
 // facility codes and SCADA identifiers stay as-is. The emulator honours
 // only reverse video, so the "blink" on moving switches, an EB'd rame and
@@ -22,12 +27,16 @@ import Foundation
 extension DCLEngine {
     /// `monitorClass` tag that routes the live timer to this screen.
     static let valcpLineMonitorClass = "VALCP_LINE"
+    /// `monitorClass` tag for MONITOR DYNAMICS, drawn on the same pasteboard.
+    static let valcpDynamicsMonitorClass = "VALCP_DYNAMICS"
 
-    /// Whether the VALCP line monitor owns the screen (the line discipline
-    /// checks this to give Ctrl/Z and Ctrl/W their SMG meanings).
-    var isValcpLineMonitorActive: Bool {
+    /// Whether a VAL-CTRL SMG screen (the line or the dynamics monitor)
+    /// owns the terminal (the line discipline checks this to give Ctrl/Z
+    /// and Ctrl/W their SMG meanings).
+    var isValcpScreenActive: Bool {
         guard liveActive, case .monitor = liveMode else { return false }
         return monitorClass == Self.valcpLineMonitorClass
+            || monitorClass == Self.valcpDynamicsMonitorClass
     }
 
     /// Track columns per half-loop. 70 columns over 500 m makes each 100 m
@@ -196,25 +205,8 @@ extension DCLEngine {
         let trains = world.sortedTrains
         let half = Sim.trackLength / 2
 
-        // Product banner (reverse-video header) and the line status.
-        var screen: [String] = []
-        screen.append(smgBar("LPD VAL-CTRL V4.2", tr("valcp.mon.title"),
-                             String(format: tr("valcp.mon.node"), nodeName)))
-        let modeKey: String
-        switch world.lineMode {
-        case .stopped:           modeKey = "valcp.ligne.mode.stopped"
-        case .normal:            modeKey = "valcp.mon.mode.normal"
-        case .serviceProvisoire: modeKey = "valcp.ligne.mode.sp"
-        case .emergency:         modeKey = "valcp.ligne.mode.emergency"
-        }
-        var mode = tr(modeKey)
-        if world.lineMode == .emergency && blinkOn { mode = "\u{1B}[7m" + mode + "\u{1B}[27m" }
-        // The train count lives in the TRAINS display label; with it here
-        // the FR emergency line ran past 79 columns and wrapped, pushing
-        // every row below it down one line.
-        screen.append(clipToScreen(" " + lpdStamp(now) + "   "
-                      + String(format: tr("valcp.mon.status"),
-                               mode, BackendManager.shared.kind.rawValue)))
+        var screen = valcpHeaderRows(title: tr("valcp.mon.title"), world: world,
+                                     now: now, blinkOn: blinkOn)
 
         // MARK: track geometry
 
@@ -353,9 +345,7 @@ extension DCLEngine {
 
         // MARK: trains display
 
-        func col(_ str: String, _ w: Int) -> String {
-            str.count >= w ? String(str.prefix(w - 1)) + " " : str.padding(toLength: w, withPad: " ", startingAt: 0)
-        }
+        let col = smgCol
         // Sums to the 77-column inner width with the longest state text.
         let widths = [6, 5, 15, 6, 9, 7, 14]
         let stateWidth = Self.screenWidth - 2 - 1 - widths.reduce(0, +)
@@ -375,20 +365,15 @@ extension DCLEngine {
             let kmh = t.speed * 3.6
             let filled = max(0, min(barWidth, Int((t.speed / Sim.manualSpeedMax * Double(barWidth)).rounded())))
             let bar = String(repeating: "█", count: filled) + String(repeating: "░", count: barWidth - filled)
-            let prog = VALSpeedProgram(rawValue: t.speedProgram)?.mnemonic
-                ?? (t.speedProgram.isEmpty ? "--" : t.speedProgram.uppercased())
-            let limit = t.distanceToMA > 9999 ? "  >9999" : String(format: "%7.1f", t.distanceToMA)
             var row = " "
             row += col(t.label, widths[0])
-            row += col(prog, widths[1])
+            row += col(programMnemonic(t), widths[1])
             row += col(String(format: "%5.1f ", kmh) + bar, widths[2])
             row += col(String(format: "%5.1f", t.consigneVitesse * 3.6), widths[3])
-            row += col(limit, widths[4])
+            row += col(limitText(t), widths[4])
             row += col(String(format: tr("valcp.mon.block.short"), blockId(t.position)), widths[5])
             row += col(t.nextStationName, widths[6])
-            let state = String(tr("dynamics.state." + lineStateKey(for: t)).prefix(stateWidth))
-            // An EB'd rame flashes its state so it reads from across the room.
-            row += (lineStateKey(for: t) == "eb" && blinkOn) ? "\u{1B}[7m" + state + "\u{1B}[27m" : state
+            row += stateText(t, width: stateWidth, blinkOn: blinkOn)
             rows.append(row)
         }
         // Keep the display a fixed height so the pasteboard never shifts.
@@ -398,18 +383,179 @@ extension DCLEngine {
             ? String(format: tr("valcp.mon.lbl.trains.part"), shown, trains.count)
             : String(format: tr("valcp.mon.lbl.trains"), trains.count)
         screen += smgDisplay(label: trainsLabel, rows: rows)
-
-        // Message row (empty, as SMG leaves it until a message arrives),
-        // then the status bar: key legend, refresh interval, elapsed time.
-        screen.append("")
-        screen.append(smgBar(tr("valcp.mon.keys"),
-                             String(format: tr("valcp.mon.interval"), localizedInterval(monitorIntervalSec)),
-                             String(format: tr("valcp.mon.elapsed"), elapsed)))
-        return screen
+        return screen + valcpFooterRows(elapsed: elapsed)
     }
 
-    /// Asservissement regime as a `dynamics.state.*` key suffix -- the same
-    /// precedence MONITOR DYNAMICS uses, but localized for the VALCP screen.
+    // MARK: -- MONITOR DYNAMICS
+
+    /// Start `MONITOR DYNAMICS` on the LPD pasteboard. The class name is
+    /// DEC's MONITOR syntax, but the display is the layered product's own
+    /// SMG screen, localised and drawn like the line monitor.
+    func startValcpDynamicsMonitor(interval: TimeInterval) {
+        valcpScreenRows = []
+        // Acceleration is a speed delta between frames; forget any samples
+        // left from an earlier run so the first frame doesn't spike.
+        lastDynamicsVelocity = [:]
+        lastDynamicsSampleAt = Date()
+        outRaw("\u{1B}[?25l")
+        startMonitor(class: Self.valcpDynamicsMonitorClass, interval: interval)
+    }
+
+    /// One frame of the dynamics monitor: 24 pasteboard rows -- product
+    /// banner, status line, then the TRAINS table (position, speed,
+    /// setpoint, acceleration, stop limit, regime), a speed-vs-setpoint
+    /// bar graph, the profile limits, a message row and the key legend.
+    func valcpDynamicsMonitorRows(elapsed: String) -> [String] {
+        guard let world else { return [tr("valcp.cmd.noworld")] }
+        let now = Date()
+        let blinkOn = Int(now.timeIntervalSinceReferenceDate * 2).isMultiple(of: 2)
+        let trains = world.sortedTrains
+        let shownTrains = Array(trains.prefix(Self.maxTableRows))
+
+        var screen = valcpHeaderRows(title: tr("valcp.dyn.title"), world: world,
+                                     now: now, blinkOn: blinkOn)
+
+        // Acceleration from the speed delta against the previous frame.
+        let dt = max(0.001, now.timeIntervalSince(lastDynamicsSampleAt))
+        var accel: [UUID: Double] = [:]
+        for t in trains {
+            accel[t.id] = (t.speed - (lastDynamicsVelocity[t.id] ?? t.speed)) / dt
+            lastDynamicsVelocity[t.id] = t.speed
+        }
+        lastDynamicsSampleAt = now
+
+        // MARK: trains display
+
+        let col = smgCol
+        // Sums to the 77-column inner width with the longest state text.
+        let widths = [6, 6, 8, 10, 7, 12, 9]
+        let stateWidth = Self.screenWidth - 2 - 1 - widths.reduce(0, +)
+        let heads = ["valcp.mon.col.train", "valcp.mon.col.prog", "valcp.dyn.col.pos",
+                     "valcp.dyn.col.speed", "valcp.dyn.col.setpt", "valcp.dyn.col.accel",
+                     "valcp.mon.col.limit"]
+        var hdr = " "
+        for (k, w) in zip(heads, widths) { hdr += col(tr(k), w) }
+        hdr += col(tr("valcp.mon.col.state"), stateWidth)
+        var rows = ["\u{1B}[7m" + hdr + "\u{1B}[27m"]
+        if trains.isEmpty {
+            rows.append(" " + tr("dynamics.empty"))
+        }
+        for t in shownTrains {
+            var row = " "
+            row += col(t.label, widths[0])
+            row += col(programMnemonic(t), widths[1])
+            row += col(String(format: "%6.1f", t.position), widths[2])
+            row += col(String(format: "%7.2f", t.speed), widths[3])
+            row += col(String(format: "%5.2f", t.consigneVitesse), widths[4])
+            row += col(String(format: "%+7.2f", accel[t.id] ?? 0), widths[5])
+            row += col(limitText(t), widths[6])
+            row += stateText(t, width: stateWidth, blinkOn: blinkOn)
+            rows.append(row)
+        }
+        while rows.count < Self.maxTableRows + 1 { rows.append("") }
+        let trainsLabel = trains.count > shownTrains.count
+            ? String(format: tr("valcp.mon.lbl.trains.part"), shownTrains.count, trains.count)
+            : String(format: tr("valcp.mon.lbl.trains"), trains.count)
+        screen += smgDisplay(label: trainsLabel, rows: rows)
+
+        // MARK: speed / setpoint bar graph
+
+        // One bar per rame on a 0..manualSpeedMax scale: the filled part is
+        // the speed, the setpoint is a bar in the opposite video, and the
+        // line speed is a dotted mark on the empty part of the scale.
+        let barWidth = 64
+        let scale = Sim.manualSpeedMax
+        func barCell(_ v: Double) -> Int {
+            max(0, min(barWidth - 1, Int((v / scale * Double(barWidth)).rounded())))
+        }
+        var trace: [String] = []
+        for t in shownTrains {
+            let filled = max(0, min(barWidth, Int((t.speed / scale * Double(barWidth)).rounded())))
+            var cells = (0..<barWidth).map { $0 < filled ? "█" : "░" }
+            let line = barCell(Sim.lineSpeed)
+            if line >= filled { cells[line] = "┆" }
+            let set = barCell(t.consigneVitesse)
+            cells[set] = set < filled ? "\u{1B}[7m┃\u{1B}[27m" : "┃"
+            trace.append(" " + col(t.label, widths[0]) + cells.joined())
+        }
+        while trace.count < Self.maxTableRows { trace.append("") }
+        screen += smgDisplay(label: String(format: tr("valcp.dyn.lbl.trace"), Int(scale)),
+                             rows: trace)
+
+        // MARK: profile limits
+
+        func num(_ v: Double, _ digits: Int) -> String {
+            let s = String(format: "%.\(digits)f", v)
+            return uiLang == .fr ? s.replacingOccurrences(of: ".", with: ",") : s
+        }
+        let profile = " " + String(format: tr("valcp.dyn.profile"),
+                                   num(Sim.lineSpeed, 1), num(Sim.maxAcceleration, 2),
+                                   num(Sim.nominalBraking, 2), num(Sim.emergencyBraking, 2))
+        screen += smgDisplay(label: tr("valcp.dyn.lbl.profile"), rows: [clipToScreen(profile)])
+
+        return screen + valcpFooterRows(elapsed: elapsed)
+    }
+
+    // MARK: -- shared pasteboard pieces
+
+    /// The product banner (reverse-video header) and the line status row
+    /// that open every VAL-CTRL screen.
+    private func valcpHeaderRows(title: String, world: MetroWorld,
+                                 now: Date, blinkOn: Bool) -> [String] {
+        var rows = [smgBar("LPD VAL-CTRL V4.2", title,
+                           String(format: tr("valcp.mon.node"), nodeName))]
+        let modeKey: String
+        switch world.lineMode {
+        case .stopped:           modeKey = "valcp.ligne.mode.stopped"
+        case .normal:            modeKey = "valcp.mon.mode.normal"
+        case .serviceProvisoire: modeKey = "valcp.ligne.mode.sp"
+        case .emergency:         modeKey = "valcp.ligne.mode.emergency"
+        }
+        var mode = tr(modeKey)
+        if world.lineMode == .emergency && blinkOn { mode = "\u{1B}[7m" + mode + "\u{1B}[27m" }
+        // The train count lives in the TRAINS display label; with it here
+        // the FR emergency line ran past 79 columns and wrapped, pushing
+        // every row below it down one line.
+        rows.append(clipToScreen(" " + lpdStamp(now) + "   "
+                    + String(format: tr("valcp.mon.status"),
+                             mode, BackendManager.shared.kind.rawValue)))
+        return rows
+    }
+
+    /// Message row (empty, as SMG leaves it until a message arrives), then
+    /// the status bar: key legend, refresh interval, elapsed time.
+    private func valcpFooterRows(elapsed: String) -> [String] {
+        ["", smgBar(tr("valcp.mon.keys"),
+                    String(format: tr("valcp.mon.interval"), localizedInterval(monitorIntervalSec)),
+                    String(format: tr("valcp.mon.elapsed"), elapsed))]
+    }
+
+    /// A left-aligned table cell, always leaving one blank column after it.
+    private func smgCol(_ str: String, _ w: Int) -> String {
+        str.count >= w ? String(str.prefix(w - 1)) + " " : str.padding(toLength: w, withPad: " ", startingAt: 0)
+    }
+
+    /// The rame's encoded speed program mnemonic, `--` when it has none.
+    private func programMnemonic(_ t: Train) -> String {
+        VALSpeedProgram(rawValue: t.speedProgram)?.mnemonic
+            ?? (t.speedProgram.isEmpty ? "--" : t.speedProgram.uppercased())
+    }
+
+    /// Distance to the stop limit, right-aligned in seven columns.
+    private func limitText(_ t: Train) -> String {
+        t.distanceToMA > 9999 ? "  >9999" : String(format: "%7.1f", t.distanceToMA)
+    }
+
+    /// The localised regime, truncated to `width`; an EB'd rame flashes its
+    /// state so it reads from across the room.
+    private func stateText(_ t: Train, width: Int, blinkOn: Bool) -> String {
+        let key = lineStateKey(for: t)
+        let state = String(tr("dynamics.state." + key).prefix(width))
+        return (key == "eb" && blinkOn) ? "\u{1B}[7m" + state + "\u{1B}[27m" : state
+    }
+
+    /// Asservissement regime as a `dynamics.state.*` key suffix, the same
+    /// precedence the Train Dynamics window uses.
     private func lineStateKey(for train: Train) -> String {
         if train.isEmergencyBrakeApplied || train.status == .emergency { return "eb" }
         if train.doorsOpen { return "dwell" }
