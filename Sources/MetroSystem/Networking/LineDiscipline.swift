@@ -98,13 +98,25 @@ final class LineDiscipline {
                 continue
             case .inCSI:
                 if (0x40...0x7E).contains(b) {
-                    handleCSI(final: b)
+                    // Cursor keys edit the command line, which a live
+                    // display doesn't have -- swallow them there.
+                    if !dcl.liveActive {
+                        handleCSI(final: b)
+                        dirty = true
+                    }
                     escState = .normal
-                    dirty = true
                 }
                 continue
             case .normal:
                 break
+            }
+            // A live display (MONITOR, the VALCP SMG screens, the test
+            // utilities) owns the screen: only its control keys -- ESC
+            // (for ESC ESC), CTRL/C, CTRL/Y, CTRL/Z, CTRL/W -- get through.
+            // Anything else would edit the hidden input line and redraw
+            // the prompt over the display.
+            if dcl.liveActive, ![0x1B, 0x03, 0x19, 0x1A, 0x17].contains(b) {
+                continue
             }
             switch b {
             case 0x1B:
